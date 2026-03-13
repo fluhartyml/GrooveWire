@@ -6,5 +6,18 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSAppleMusicUsageDescription</key>
+	<string>Tangerine Grovewire needs Apple Music access to search and play songs in bridges.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>tngrnGrvWr</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>com.TangerineGrooveWire.TngrnGrvWr</string>
+		</dict>
+	</array>
 </dict>
 </plist>

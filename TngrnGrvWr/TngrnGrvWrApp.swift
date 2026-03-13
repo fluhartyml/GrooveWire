@@ -10,6 +10,9 @@ import SwiftData
 
 @main
 struct TngrnGrvWrApp: App {
+    @State private var spotifyService = SpotifyService()
+    @State private var appleMusicService = AppleMusicService()
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             User.self,
@@ -29,6 +32,8 @@ struct TngrnGrvWrApp: App {
     var body: some Scene {
         WindowGroup {
             MainTabView()
+                .environment(spotifyService)
+                .environment(appleMusicService)
         }
         .modelContainer(sharedModelContainer)
     }
