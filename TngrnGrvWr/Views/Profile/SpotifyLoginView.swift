@@ -5,6 +5,8 @@ struct SpotifyLoginView: View {
     let authManager: SpotifyAuthManager
     @Environment(\.dismiss) private var dismiss
     @State private var error: String?
+    @State private var authSession: ASWebAuthenticationSession?
+    @State private var contextProvider = AuthContextProvider()
 
     var body: some View {
         VStack(spacing: 20) {
@@ -15,7 +17,7 @@ struct SpotifyLoginView: View {
             Text("Connect Spotify")
                 .font(.title2.bold())
 
-            Text("Sign in to your Spotify account to search and play music in bridges.")
+            Text("Sign in to your Spotify account to search and play music on GrooveWire.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal)
@@ -45,7 +47,7 @@ struct SpotifyLoginView: View {
     private func startAuth() {
         let url = authManager.generateAuthURL()
 
-        let session = ASWebAuthenticationSession(
+        authSession = ASWebAuthenticationSession(
             url: url,
             callback: .customScheme("tngrnGrvWr")
         ) { callbackURL, sessionError in
@@ -66,7 +68,23 @@ struct SpotifyLoginView: View {
                 }
             }
         }
-        session.prefersEphemeralWebBrowserSession = false
-        session.start()
+        authSession?.presentationContextProvider = contextProvider
+        authSession?.prefersEphemeralWebBrowserSession = false
+        authSession?.start()
+    }
+}
+
+// MARK: - Presentation Context
+
+private class AuthContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        #if os(iOS)
+        return UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow } ?? ASPresentationAnchor()
+        #else
+        return NSApplication.shared.keyWindow ?? ASPresentationAnchor()
+        #endif
     }
 }

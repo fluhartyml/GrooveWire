@@ -9,7 +9,7 @@ struct MainTabView: View {
                 }
             }
 
-            Tab("Bridges", systemImage: "antenna.radiowaves.left.and.right") {
+            Tab("GrooveWire", systemImage: "antenna.radiowaves.left.and.right") {
                 NavigationStack {
                     BridgeListView()
                 }

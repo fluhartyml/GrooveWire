@@ -50,7 +50,7 @@ struct BridgeTradingCard: View {
                 Text("\(bridge.tracks.count) tracks")
                     .font(.caption2)
                 Spacer()
-                Text("Tangerine Grovewire")
+                Text("Tangerine GrooveWire")
                     .font(.caption2.bold())
             }
             .foregroundStyle(.secondary)

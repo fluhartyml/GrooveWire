@@ -14,7 +14,7 @@ struct BridgeShareSheet: View {
                     .padding()
 
                 ShareLink(
-                    item: "\(bridge.name) — \(bridge.tracks.count) tracks on Tangerine Grovewire",
+                    item: "\(bridge.name) — \(bridge.tracks.count) tracks on Tangerine GrooveWire",
                     preview: SharePreview(bridge.name, image: Image(systemName: "antenna.radiowaves.left.and.right"))
                 ) {
                     Label("Share", systemImage: "square.and.arrow.up")

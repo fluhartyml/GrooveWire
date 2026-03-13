@@ -14,7 +14,7 @@ struct ProfileView: View {
             }
 
             Section("About") {
-                Label("Tangerine Grovewire", systemImage: "antenna.radiowaves.left.and.right")
+                Label("Tangerine GrooveWire", systemImage: "antenna.radiowaves.left.and.right")
             }
         }
         .navigationTitle("Profile")
