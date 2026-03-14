@@ -6,10 +6,79 @@ final class SpotifyService: StreamingServiceProtocol {
 
     var isConnected: Bool { authManager.isAuthenticated }
 
+    var availableDevices: [SpotifyDevice] = []
+    var selectedDeviceID: String?
+
     private let baseURL = "https://api.spotify.com/v1"
 
     init(authManager: SpotifyAuthManager = SpotifyAuthManager()) {
         self.authManager = authManager
+    }
+
+    // MARK: - Profile
+
+    func fetchProfile() async throws -> SpotifyProfile {
+        let token = try await authManager.validToken()
+        let url = URL(string: "\(baseURL)/me")!
+
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response)
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw SpotifyError.apiError(0)
+        }
+
+        let displayName = json["display_name"] as? String
+        let email = json["email"] as? String
+        let spotifyID = json["id"] as? String
+
+        var avatarURL: String?
+        if let images = json["images"] as? [[String: Any]], !images.isEmpty {
+            let sorted = images.sorted {
+                ($0["height"] as? Int ?? 0) > ($1["height"] as? Int ?? 0)
+            }
+            avatarURL = sorted.first?["url"] as? String
+        }
+
+        return SpotifyProfile(
+            displayName: displayName,
+            email: email,
+            avatarURL: avatarURL,
+            spotifyID: spotifyID
+        )
+    }
+
+    // MARK: - Devices
+
+    func fetchDevices() async throws {
+        let token = try await authManager.validToken()
+        let url = URL(string: "\(baseURL)/me/player/devices")!
+
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, _) = try await URLSession.shared.data(for: request)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let devices = json["devices"] as? [[String: Any]] else {
+            availableDevices = []
+            return
+        }
+
+        availableDevices = devices.compactMap { d in
+            guard let id = d["id"] as? String,
+                  let name = d["name"] as? String,
+                  let type = d["type"] as? String,
+                  let isActive = d["is_active"] as? Bool else { return nil }
+            return SpotifyDevice(id: id, name: name, type: type, isActive: isActive)
+        }
+
+        if selectedDeviceID == nil {
+            selectedDeviceID = availableDevices.first(where: { $0.isActive })?.id
+                ?? availableDevices.first?.id
+        }
     }
 
     // MARK: - Auth
@@ -27,13 +96,25 @@ final class SpotifyService: StreamingServiceProtocol {
 
     func search(query: String) async throws -> [Track] {
         let token = try await authManager.validToken()
-        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        let url = URL(string: "\(baseURL)/search?q=\(encoded)&type=track&limit=20")!
+        var components = URLComponents(string: "\(baseURL)/search")!
+        components.queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "type", value: "track")
+        ]
+        let url = components.url!
+        print("🔍 [SpotifyService] Request URL: \(url.absoluteString)")
 
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        print("🔍 [SpotifyService] Token prefix: \(String(token.prefix(10)))...")
 
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse {
+            print("🔍 [SpotifyService] Search HTTP \(http.statusCode)")
+        }
+        if let raw = String(data: data, encoding: .utf8) {
+            print("🔍 [SpotifyService] Response (first 500): \(String(raw.prefix(500)))")
+        }
         return try parseSearchResults(data)
     }
 
@@ -42,7 +123,12 @@ final class SpotifyService: StreamingServiceProtocol {
     func play(track: Track) async throws {
         guard let spotifyID = track.spotifyID else { return }
         let token = try await authManager.validToken()
-        let url = URL(string: "\(baseURL)/me/player/play")!
+
+        var urlString = "\(baseURL)/me/player/play"
+        if let deviceID = selectedDeviceID {
+            urlString += "?device_id=\(deviceID)"
+        }
+        let url = URL(string: urlString)!
 
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
@@ -147,6 +233,34 @@ final class SpotifyService: StreamingServiceProtocol {
             )
         }
     }
+}
+
+// MARK: - Device
+
+struct SpotifyDevice: Identifiable {
+    let id: String
+    let name: String
+    let type: String       // "Computer", "TV", "Speaker", "Smartphone", etc.
+    let isActive: Bool
+
+    var icon: String {
+        switch type.lowercased() {
+        case "computer": return "laptopcomputer"
+        case "tv": return "tv"
+        case "speaker": return "hifispeaker"
+        case "smartphone": return "iphone"
+        default: return "speaker.wave.2"
+        }
+    }
+}
+
+// MARK: - Profile
+
+struct SpotifyProfile {
+    let displayName: String?
+    let email: String?
+    let avatarURL: String?
+    let spotifyID: String?
 }
 
 // MARK: - Errors

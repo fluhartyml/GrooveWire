@@ -10,10 +10,19 @@ struct BridgeCard: View {
 
             HStack(spacing: 8) {
                 Label("\(bridge.tracks.count)", systemImage: "music.note.list")
+                Label("\(bridge.participantCount)", systemImage: "person.2")
                 if bridge.isPublic {
                     Label("Public", systemImage: "globe")
                 } else {
                     Label("Private", systemImage: "lock.fill")
+                }
+                if bridge.isActive {
+                    Text("LIVE")
+                        .font(.caption2.bold())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.red, in: Capsule())
                 }
             }
             .font(.caption)

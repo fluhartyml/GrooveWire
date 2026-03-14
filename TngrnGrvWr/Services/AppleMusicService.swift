@@ -4,6 +4,7 @@ import MusicKit
 @Observable
 final class AppleMusicService: StreamingServiceProtocol {
     var isConnected: Bool { authorizationStatus == .authorized }
+    var hasSubscription: Bool = false
     private var authorizationStatus: MusicAuthorization.Status = .notDetermined
     private let player = ApplicationMusicPlayer.shared
 
@@ -18,6 +19,18 @@ final class AppleMusicService: StreamingServiceProtocol {
         await MainActor.run { authorizationStatus = status }
         if status != .authorized {
             throw AppleMusicError.notAuthorized
+        }
+        await checkSubscription()
+    }
+
+    func checkSubscription() async {
+        do {
+            let subscription = try await MusicSubscription.current
+            await MainActor.run {
+                hasSubscription = subscription.canPlayCatalogContent
+            }
+        } catch {
+            print("[AppleMusic] Subscription check failed: \(error.localizedDescription)")
         }
     }
 

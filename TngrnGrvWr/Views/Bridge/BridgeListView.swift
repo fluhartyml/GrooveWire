@@ -4,6 +4,9 @@ import SwiftData
 struct BridgeListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Bridge.createdAt, order: .reverse) private var bridges: [Bridge]
+    @State private var showNewBridge = false
+    @State private var newBridgeName = ""
+    @State private var newBridgePrivate = false
 
     var body: some View {
         List {
@@ -14,13 +17,24 @@ struct BridgeListView: View {
             }
             .onDelete(perform: deleteBridges)
         }
-        .navigationTitle("Bridges")
+        .navigationTitle("GrooveWire")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button(action: createBridge) {
+                Button { showNewBridge = true } label: {
                     Label("New Bridge", systemImage: "plus")
                 }
             }
+        }
+        .alert("New Bridge", isPresented: $showNewBridge) {
+            TextField("Bridge name", text: $newBridgeName)
+            Toggle("Private (host-only invites)", isOn: $newBridgePrivate)
+            Button("Create") { createBridge() }
+            Button("Cancel", role: .cancel) {
+                newBridgeName = ""
+                newBridgePrivate = false
+            }
+        } message: {
+            Text("Give your bridge a name.")
         }
         .overlay {
             if bridges.isEmpty {
@@ -34,8 +48,15 @@ struct BridgeListView: View {
     }
 
     private func createBridge() {
-        let bridge = Bridge(name: "New Bridge", hostID: UUID())
+        let name = newBridgeName.trimmingCharacters(in: .whitespaces)
+        let bridge = Bridge(
+            name: name.isEmpty ? "My Bridge" : name,
+            hostID: UUID(),
+            isPublic: !newBridgePrivate
+        )
         modelContext.insert(bridge)
+        newBridgeName = ""
+        newBridgePrivate = false
     }
 
     private func deleteBridges(offsets: IndexSet) {

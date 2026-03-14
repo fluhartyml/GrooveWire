@@ -12,40 +12,55 @@ struct SearchView: View {
     @State private var query = ""
     @State private var results: [Track] = []
     @State private var isSearching = false
+    @State private var hasSearched = false
     @State private var error: String?
 
     var body: some View {
         NavigationStack {
-            List {
-                if let error {
-                    Section {
-                        Text(error)
-                            .foregroundStyle(.red)
-                    }
-                }
+            VStack(spacing: 0) {
+                // Search bar
+                HStack {
+                    TextField("Search for songs...", text: $query)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { performSearch() }
 
-                if results.isEmpty && !isSearching && !query.isEmpty {
-                    ContentUnavailableView.search(text: query)
+                    Button("Search") { performSearch() }
+                        .disabled(query.isEmpty || isSearching)
                 }
+                .padding()
 
-                ForEach(results) { track in
-                    Button {
-                        addTrack(track)
-                    } label: {
-                        HStack {
-                            TrackRow(track: track)
-                            Spacer()
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(.green)
+                // Results
+                List {
+                    if let error {
+                        Section {
+                            Text(error)
+                                .foregroundStyle(.red)
                         }
                     }
-                    .tint(.primary)
+
+                    if results.isEmpty && !isSearching && hasSearched {
+                        ContentUnavailableView.search(text: query)
+                    }
+
+                    ForEach(results) { track in
+                        Button {
+                            addTrack(track)
+                        } label: {
+                            HStack {
+                                TrackRow(track: track)
+                                Spacer()
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundStyle(.green)
+                            }
+                        }
+                        .tint(.primary)
+                    }
                 }
-            }
-            .searchable(text: $query, prompt: "Search for songs...")
-            .onSubmit(of: .search) { performSearch() }
-            .onChange(of: query) { _, newValue in
-                if newValue.isEmpty { results = [] }
+                .overlay {
+                    if isSearching {
+                        ProgressView("Searching...")
+                    }
+                }
             }
             .navigationTitle("Add Tracks")
             #if os(iOS)
@@ -56,29 +71,37 @@ struct SearchView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .overlay {
-                if isSearching {
-                    ProgressView("Searching...")
-                }
-            }
         }
+        .frame(minWidth: 500, minHeight: 400)
     }
 
     private func performSearch() {
-        guard !query.isEmpty else { return }
+        print("🔍 [SearchView] performSearch() CALLED — query: '\(query)'")
+        guard !query.isEmpty else {
+            print("🔍 [SearchView] query is empty, returning")
+            return
+        }
         isSearching = true
+        hasSearched = true
         error = nil
+        print("🔍 [SearchView] Spotify connected: \(spotifyService.isConnected), Apple Music connected: \(appleMusicService.isConnected)")
 
         Task {
             do {
                 if spotifyService.isConnected {
+                    print("🔍 [SearchView] Calling Spotify search...")
                     results = try await spotifyService.search(query: query)
+                    print("🔍 [SearchView] Got \(results.count) results from Spotify")
                 } else if appleMusicService.isConnected {
+                    print("🔍 [SearchView] Calling Apple Music search...")
                     results = try await appleMusicService.search(query: query)
+                    print("🔍 [SearchView] Got \(results.count) results from Apple Music")
                 } else {
+                    print("🔍 [SearchView] No service connected!")
                     error = "Connect a streaming service in Profile to search."
                 }
             } catch {
+                print("🔍 [SearchView] ERROR: \(error)")
                 self.error = error.localizedDescription
             }
             isSearching = false
