@@ -122,17 +122,29 @@ struct ProfileView: View {
     @ViewBuilder
     private var spotifyRow: some View {
         if spotifyService.isConnected {
-            HStack {
-                Label("Spotify", systemImage: "dot.radiowaves.left.and.right")
-                    .foregroundStyle(.primary)
-                Spacer()
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-            }
-            .swipeActions {
-                Button("Disconnect", role: .destructive) {
-                    spotifyService.disconnect()
+            HStack(spacing: 8) {
+                Label {
+                    HStack(spacing: 6) {
+                        Text("Spotify")
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.caption)
+                    }
+                } icon: {
+                    Image(systemName: "dot.radiowaves.left.and.right")
                 }
+                .foregroundStyle(.primary)
+
+                Spacer()
+
+                Button {
+                    spotifyService.disconnect()
+                } label: {
+                    Image(systemName: "circle.slash")
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
+                .help("Disconnect")
             }
         } else {
             Button {
@@ -146,17 +158,29 @@ struct ProfileView: View {
     @ViewBuilder
     private var appleMusicRow: some View {
         if appleMusicService.isConnected {
-            HStack {
-                Label("Apple Music", systemImage: "apple.logo")
-                    .foregroundStyle(.primary)
-                Spacer()
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-            }
-            .swipeActions {
-                Button("Disconnect", role: .destructive) {
-                    appleMusicService.disconnect()
+            HStack(spacing: 8) {
+                Label {
+                    HStack(spacing: 6) {
+                        Text("Apple Music")
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.caption)
+                    }
+                } icon: {
+                    Image(systemName: "apple.logo")
                 }
+                .foregroundStyle(.primary)
+
+                Spacer()
+
+                Button {
+                    appleMusicService.disconnect()
+                } label: {
+                    Image(systemName: "circle.slash")
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
+                .help("Disconnect")
             }
         } else {
             Button {
