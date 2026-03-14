@@ -9,7 +9,7 @@ struct BridgeCard: View {
                 .font(.headline)
 
             HStack(spacing: 8) {
-                Label("\(bridge.tracks.count)", systemImage: "music.note.list")
+                Label("\(bridge.trackList.count)", systemImage: "music.note.list")
                 Label("\(bridge.participantCount)", systemImage: "person.2")
                 if bridge.isPublic {
                     Label("Public", systemImage: "globe")

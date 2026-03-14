@@ -3,14 +3,14 @@ import SwiftData
 
 @Model
 final class User {
-    @Attribute(.unique) var id: UUID
-    var displayName: String
+    var id: UUID = UUID()
+    var displayName: String = ""
     var email: String?
     var phoneNumber: String?
-    var streamingService: StreamingService
+    var streamingService: StreamingService = StreamingService.none
     var avatarURL: String?
-    var isProfileComplete: Bool
-    var createdAt: Date
+    var isProfileComplete: Bool = false
+    var createdAt: Date = Date()
 
     init(
         id: UUID = UUID(),

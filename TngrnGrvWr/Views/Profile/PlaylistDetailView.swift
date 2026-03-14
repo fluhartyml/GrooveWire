@@ -116,7 +116,7 @@ struct PlaylistDetailView: View {
 
     private func loadIntoBridge(_ bridge: Bridge) {
         for track in tracks {
-            bridge.tracks.append(track)
+            bridge.trackList.append(track)
         }
         try? modelContext.save()
     }
@@ -146,7 +146,7 @@ struct BridgePickerSheet: View {
                                 VStack(alignment: .leading) {
                                     Text(bridge.name)
                                         .font(.headline)
-                                    Text("\(bridge.tracks.count) tracks")
+                                    Text("\(bridge.trackList.count) tracks")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }

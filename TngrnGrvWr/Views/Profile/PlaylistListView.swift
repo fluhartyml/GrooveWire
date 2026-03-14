@@ -14,10 +14,10 @@ struct PlaylistListView: View {
     // All tracks for the selected playlist, or all playlists combined
     private var displayedTracks: [Track] {
         if let selected = selectedPlaylist {
-            return selected.tracks
+            return selected.trackList
         }
         // "All Songs" — flatten every saved playlist
-        return savedPlaylists.flatMap { $0.tracks }
+        return savedPlaylists.flatMap { $0.trackList }
     }
 
     private var trackSectionTitle: String {
@@ -135,7 +135,7 @@ struct PlaylistListView: View {
         .sheet(isPresented: $showBridgePicker) {
             BridgePickerSheet(tracks: displayedTracks, bridges: bridges) { bridge in
                 for track in displayedTracks {
-                    bridge.tracks.append(track)
+                    bridge.trackList.append(track)
                 }
                 try? modelContext.save()
             }
@@ -464,7 +464,7 @@ struct AddPlaylistSheet: View {
                 )
                 localTrack.savedPlaylist = savedPlaylist
                 modelContext.insert(localTrack)
-                savedPlaylist.tracks.append(localTrack)
+                savedPlaylist.trackList.append(localTrack)
             }
 
             try modelContext.save()

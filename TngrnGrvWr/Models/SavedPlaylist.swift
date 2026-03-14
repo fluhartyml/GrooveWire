@@ -3,17 +3,17 @@ import SwiftData
 
 @Model
 final class SavedPlaylist {
-    @Attribute(.unique) var id: UUID
-    var name: String
+    var id: UUID = UUID()
+    var name: String = ""
     var spotifyPlaylistID: String?
     var appleMusicPlaylistID: String?
     var playlistDescription: String?
-    var isPublic: Bool
-    var createdAt: Date
+    var isPublic: Bool = false
+    var createdAt: Date = Date()
     var imageURL: String?
     var ownerName: String?
 
-    @Relationship(deleteRule: .cascade) var tracks: [Track]
+    @Relationship(deleteRule: .cascade) var tracks: [Track]?
 
     init(
         id: UUID = UUID(),
@@ -38,5 +38,11 @@ final class SavedPlaylist {
         self.tracks = []
     }
 
-    var trackCount: Int { tracks.count }
+    /// Safe accessor for tracks (unwraps optional relationship)
+    var trackList: [Track] {
+        get { tracks ?? [] }
+        set { tracks = newValue }
+    }
+
+    var trackCount: Int { trackList.count }
 }

@@ -25,7 +25,7 @@ struct BridgeTradingCard: View {
 
             // Track list preview
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(bridge.tracks.prefix(4).enumerated()), id: \.offset) { index, track in
+                ForEach(Array(bridge.trackList.prefix(4).enumerated()), id: \.offset) { index, track in
                     HStack {
                         Text("\(index + 1).")
                             .font(.caption.monospacedDigit())
@@ -35,8 +35,8 @@ struct BridgeTradingCard: View {
                             .lineLimit(1)
                     }
                 }
-                if bridge.tracks.count > 4 {
-                    Text("+ \(bridge.tracks.count - 4) more")
+                if bridge.trackList.count > 4 {
+                    Text("+ \(bridge.trackList.count - 4) more")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -47,7 +47,7 @@ struct BridgeTradingCard: View {
 
             // Footer
             HStack {
-                Text("\(bridge.tracks.count) tracks")
+                Text("\(bridge.trackList.count) tracks")
                     .font(.caption2)
                 Spacer()
                 Text("Tangerine GrooveWire")
@@ -71,7 +71,7 @@ struct BridgeTradingCard: View {
 
     @ViewBuilder
     private var artworkGrid: some View {
-        let artworks = bridge.tracks.prefix(4).compactMap { $0.artworkURL }
+        let artworks = bridge.trackList.prefix(4).compactMap { $0.artworkURL }
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 4) {
             ForEach(0..<4, id: \.self) { index in
                 if index < artworks.count, let url = URL(string: artworks[index]) {

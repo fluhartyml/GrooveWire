@@ -3,19 +3,19 @@ import SwiftData
 
 @Model
 final class Bridge {
-    @Attribute(.unique) var id: UUID
-    var name: String
-    var hostID: UUID
-    var isPublic: Bool
-    var isActive: Bool
-    var createdAt: Date
+    var id: UUID = UUID()
+    var name: String = ""
+    var hostID: UUID = UUID()
+    var isPublic: Bool = true
+    var isActive: Bool = false
+    var createdAt: Date = Date()
 
     // Role map: userID string → BridgeRole raw value
-    var roles: [String: String]
-    var bannedIDs: [String]
+    var roles: [String: String] = [:]
+    var bannedIDs: [String] = []
 
-    @Relationship(deleteRule: .cascade) var tracks: [Track]
-    @Relationship(deleteRule: .cascade) var messages: [Message]
+    @Relationship(deleteRule: .cascade) var tracks: [Track]?
+    @Relationship(deleteRule: .cascade) var messages: [Message]?
 
     init(
         id: UUID = UUID(),
@@ -125,6 +125,18 @@ final class Bridge {
 
     // MARK: - Computed
 
+    /// Safe accessor for tracks (unwraps optional relationship)
+    var trackList: [Track] {
+        get { tracks ?? [] }
+        set { tracks = newValue }
+    }
+
+    /// Safe accessor for messages (unwraps optional relationship)
+    var messageList: [Message] {
+        get { messages ?? [] }
+        set { messages = newValue }
+    }
+
     var memberIDs: [String] {
         Array(roles.keys)
     }
@@ -164,5 +176,27 @@ final class Bridge {
 
     func demoteFromBouncer(_ userID: UUID) {
         demoteToParticipant(userID)
+    }
+
+    // MARK: - Vote-Sorted Queue
+
+    /// Returns upcoming tracks sorted by vote weight.
+    /// Pinned first → highest voteScore → normal → lowest voteScore → buried last.
+    /// Ties preserve original add order (stable sort).
+    func sortedUpcoming(after index: Int) -> [Track] {
+        let allTracks = trackList
+        guard allTracks.count > index + 1 else { return [] }
+        let upcoming = Array(allTracks[(index + 1)...])
+
+        return upcoming.sorted { a, b in
+            // Pinned tracks always first
+            if a.isPinned != b.isPinned { return a.isPinned }
+            // Buried tracks always last
+            if a.isBuried != b.isBuried { return b.isBuried }
+            // Higher vote score comes first
+            if a.voteScore != b.voteScore { return a.voteScore > b.voteScore }
+            // Tie: preserve original order (earlier addedAt first)
+            return a.addedAt < b.addedAt
+        }
     }
 }

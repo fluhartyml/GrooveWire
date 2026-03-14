@@ -3,16 +3,22 @@ import SwiftData
 
 @Model
 final class Track {
-    @Attribute(.unique) var id: UUID
-    var title: String
-    var artist: String
+    var id: UUID = UUID()
+    var title: String = ""
+    var artist: String = ""
     var albumTitle: String?
     var artworkURL: String?
     var appleMusicID: String?
     var spotifyID: String?
-    var durationSeconds: Double
-    var addedBy: UUID
-    var addedAt: Date
+    var durationSeconds: Double = 0
+    var addedBy: UUID = UUID()
+    var addedAt: Date = Date()
+
+    // Voting
+    var voteScore: Int = 0
+    var voterIDs: [String: Bool] = [:]  // userID string → true=up, false=down
+    var isPinned: Bool = false           // host forced to top of queue
+    var isBuried: Bool = false           // host forced to bottom of queue
 
     var bridge: Bridge?
     var savedPlaylist: SavedPlaylist?
@@ -39,5 +45,54 @@ final class Track {
         self.durationSeconds = durationSeconds
         self.addedBy = addedBy
         self.addedAt = addedAt
+    }
+
+    // MARK: - Voting
+
+    /// Cast or change a vote. One vote per user — replaces any previous vote.
+    func vote(userID: UUID, isUpvote: Bool) {
+        let key = userID.uuidString
+        let existing = voterIDs[key]
+
+        // Remove previous vote effect
+        if let was = existing {
+            voteScore += was ? -1 : 1
+        }
+
+        // Apply new vote
+        voterIDs[key] = isUpvote
+        voteScore += isUpvote ? 1 : -1
+    }
+
+    /// Remove a user's vote entirely.
+    func removeVote(userID: UUID) {
+        let key = userID.uuidString
+        guard let was = voterIDs.removeValue(forKey: key) else { return }
+        voteScore += was ? -1 : 1
+    }
+
+    /// Check how a user voted (nil = no vote).
+    func userVote(_ userID: UUID) -> Bool? {
+        voterIDs[userID.uuidString]
+    }
+
+    // MARK: - Host Override
+
+    /// Pin this track to play next (host override).
+    func pin() {
+        isPinned = true
+        isBuried = false
+    }
+
+    /// Bury this track to play last (host override).
+    func bury() {
+        isBuried = true
+        isPinned = false
+    }
+
+    /// Clear any host override.
+    func clearOverride() {
+        isPinned = false
+        isBuried = false
     }
 }

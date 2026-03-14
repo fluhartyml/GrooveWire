@@ -2,22 +2,21 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-	</array>
-	<key>NSAppleMusicUsageDescription</key>
-	<string>Tangerine GrooveWire needs Apple Music access to search and play songs in bridges.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.TangerineGrooveWire.TngrnGrvWr</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>tngrnGrvWr</string>
 			</array>
-			<key>CFBundleURLName</key>
-			<string>com.TangerineGrooveWire.TngrnGrvWr</string>
 		</dict>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+		<string>audio</string>
 	</array>
 </dict>
 </plist>

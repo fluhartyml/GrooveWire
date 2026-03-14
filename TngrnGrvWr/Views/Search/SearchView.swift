@@ -119,7 +119,7 @@ struct SearchView: View {
             durationSeconds: track.durationSeconds,
             addedBy: track.addedBy
         )
-        bridge.tracks.append(newTrack)
+        bridge.trackList.append(newTrack)
         modelContext.insert(newTrack)
 
         // Brief haptic feedback

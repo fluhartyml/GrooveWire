@@ -212,7 +212,7 @@ struct AddPlaylistToBridgeSheet: View {
                     durationSeconds: track.durationSeconds,
                     addedBy: bridge.hostID
                 )
-                bridge.tracks.append(newTrack)
+                bridge.trackList.append(newTrack)
                 modelContext.insert(newTrack)
             }
 
@@ -267,7 +267,7 @@ struct AddPlaylistToBridgeSheet: View {
                         durationSeconds: match.durationSeconds,
                         addedBy: bridge.hostID
                     )
-                    bridge.tracks.append(newTrack)
+                    bridge.trackList.append(newTrack)
                     modelContext.insert(newTrack)
                     addedTracks.append(newTrack)
                 } else {

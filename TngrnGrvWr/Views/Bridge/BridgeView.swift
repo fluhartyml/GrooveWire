@@ -55,7 +55,7 @@ struct BridgeView: View {
                             )
                         }
 
-                        if !bridge.tracks.isEmpty {
+                        if !bridge.trackList.isEmpty {
                             Button {
                                 Task { await saveBridgeAsPlaylist() }
                             } label: {
@@ -139,8 +139,8 @@ struct BridgeView: View {
     // MARK: - Sections
 
     private var currentTrack: Track? {
-        guard !bridge.tracks.isEmpty, currentIndex < bridge.tracks.count else { return nil }
-        return bridge.tracks[currentIndex]
+        guard !bridge.trackList.isEmpty, currentIndex < bridge.trackList.count else { return nil }
+        return bridge.trackList[currentIndex]
     }
 
     @ViewBuilder
@@ -158,16 +158,71 @@ struct BridgeView: View {
 
     @ViewBuilder
     private var queueSection: some View {
-        let upcoming = bridge.tracks.count > currentIndex + 1
-            ? Array(bridge.tracks[(currentIndex + 1)...])
-            : []
+        let upcoming = bridge.sortedUpcoming(after: currentIndex)
         Section("Up Next (\(upcoming.count))") {
             if upcoming.isEmpty {
                 Text("Queue is empty — tap + to add tracks")
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(upcoming) { track in
-                    TrackRow(track: track)
+                    TrackRow(
+                        track: track,
+                        currentUserID: bridge.hostID, // TODO: replace with actual current user ID
+                        onVoteUp: { track.vote(userID: bridge.hostID, isUpvote: true) },
+                        onVoteDown: { track.vote(userID: bridge.hostID, isUpvote: false) }
+                    )
+                    .swipeActions(edge: .trailing) {
+                        Button {
+                            track.vote(userID: bridge.hostID, isUpvote: false)
+                        } label: {
+                            Label("Thumbs Down", systemImage: "hand.thumbsdown")
+                        }
+                        .tint(.red)
+                    }
+                    .swipeActions(edge: .leading) {
+                        Button {
+                            track.vote(userID: bridge.hostID, isUpvote: true)
+                        } label: {
+                            Label("Thumbs Up", systemImage: "hand.thumbsup")
+                        }
+                        .tint(.green)
+                    }
+                    .contextMenu {
+                        Button {
+                            track.vote(userID: bridge.hostID, isUpvote: true)
+                        } label: {
+                            Label("Thumbs Up", systemImage: "hand.thumbsup")
+                        }
+
+                        Button {
+                            track.vote(userID: bridge.hostID, isUpvote: false)
+                        } label: {
+                            Label("Thumbs Down", systemImage: "hand.thumbsdown")
+                        }
+
+                        Divider()
+
+                        // Host/cohost override actions
+                        Button {
+                            track.pin()
+                        } label: {
+                            Label("Play Next", systemImage: "pin.fill")
+                        }
+
+                        Button {
+                            track.bury()
+                        } label: {
+                            Label("Play Last", systemImage: "arrow.down.to.line")
+                        }
+
+                        if track.isPinned || track.isBuried {
+                            Button {
+                                track.clearOverride()
+                            } label: {
+                                Label("Clear Override", systemImage: "xmark.circle")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -195,7 +250,7 @@ struct BridgeView: View {
                 Image(systemName: "forward.fill")
                     .font(.title2)
             }
-            .disabled(currentIndex >= bridge.tracks.count - 1)
+            .disabled(currentIndex >= bridge.trackList.count - 1)
 
             Spacer()
         }
@@ -204,7 +259,7 @@ struct BridgeView: View {
     }
 
     private func skipForward() {
-        guard currentIndex < bridge.tracks.count - 1 else { return }
+        guard currentIndex < bridge.trackList.count - 1 else { return }
         currentIndex += 1
         if isPlaying, let track = currentTrack {
             Task {
@@ -234,12 +289,12 @@ struct BridgeView: View {
     // MARK: - Save as Playlist
 
     private func saveBridgeAsPlaylist() async {
-        guard !bridge.tracks.isEmpty else { return }
+        guard !bridge.trackList.isEmpty else { return }
         isSavingPlaylist = true
         defer { isSavingPlaylist = false }
 
         let playlistName = bridge.name
-        let trackIDs = bridge.tracks.compactMap { $0.spotifyID }
+        let trackIDs = bridge.trackList.compactMap { $0.spotifyID }
 
         var spotifyPlaylistID: String?
 
@@ -268,7 +323,7 @@ struct BridgeView: View {
         )
         modelContext.insert(savedPlaylist)
 
-        for track in bridge.tracks {
+        for track in bridge.trackList {
             let localTrack = Track(
                 title: track.title,
                 artist: track.artist,
@@ -280,14 +335,14 @@ struct BridgeView: View {
             )
             localTrack.savedPlaylist = savedPlaylist
             modelContext.insert(localTrack)
-            savedPlaylist.tracks.append(localTrack)
+            savedPlaylist.trackList.append(localTrack)
         }
 
         do {
             try modelContext.save()
             let spotifyNote = spotifyPlaylistID != nil ? " and Spotify" : ""
-            savePlaylistMessage = "Saved '\(playlistName)' with \(bridge.tracks.count) tracks to your library\(spotifyNote)!"
-            print("[Bridge] Saved playlist '\(playlistName)' locally with \(bridge.tracks.count) tracks")
+            savePlaylistMessage = "Saved '\(playlistName)' with \(bridge.trackList.count) tracks to your library\(spotifyNote)!"
+            print("[Bridge] Saved playlist '\(playlistName)' locally with \(bridge.trackList.count) tracks")
         } catch {
             savePlaylistMessage = "Failed to save: \(error.localizedDescription)"
         }

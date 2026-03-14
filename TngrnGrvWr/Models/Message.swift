@@ -3,11 +3,11 @@ import SwiftData
 
 @Model
 final class Message {
-    @Attribute(.unique) var id: UUID
-    var senderID: UUID
-    var senderName: String
-    var text: String
-    var sentAt: Date
+    var id: UUID = UUID()
+    var senderID: UUID = UUID()
+    var senderName: String = ""
+    var text: String = ""
+    var sentAt: Date = Date()
 
     var bridge: Bridge?
 

@@ -10,7 +10,7 @@ struct BridgeShareSheet: View {
     }
 
     private var shareText: String {
-        "Join my GrooveWire bridge \"\(bridge.name)\"! \(bridge.tracks.count) tracks queued up.\n\(inviteLink)"
+        "Join my GrooveWire bridge \"\(bridge.name)\"! \(bridge.trackList.count) tracks queued up.\n\(inviteLink)"
     }
 
     var body: some View {
