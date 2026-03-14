@@ -98,6 +98,18 @@ final class SpotifyService: StreamingServiceProtocol {
         return allPlaylists
     }
 
+    func unfollowPlaylist(playlistID: String) async throws {
+        let token = try await authManager.validToken()
+        let url = URL(string: "\(baseURL)/playlists/\(playlistID)/followers")!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response)
+    }
+
     func fetchPlaylistTracks(playlistID: String) async throws -> [Track] {
         let token = try await authManager.validToken()
         var allTracks: [Track] = []

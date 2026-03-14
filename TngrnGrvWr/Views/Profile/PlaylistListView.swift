@@ -47,31 +47,32 @@ struct PlaylistListView: View {
                     }
                 }
 
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        // "All Songs" row
-                        playlistButton(name: "All Songs", icon: "music.note", count: nil, isSelected: selectedPlaylist == nil) {
-                            selectedPlaylist = nil
+                List {
+                    // "All Songs" row
+                    playlistButton(name: "All Songs", icon: "music.note", count: nil, isSelected: selectedPlaylist == nil) {
+                        selectedPlaylist = nil
+                    }
+
+                    ForEach(playlists) { playlist in
+                        playlistButton(
+                            name: playlist.name,
+                            icon: playlist.isPublic ? "globe" : "lock.fill",
+                            count: playlist.trackCount,
+                            isSelected: selectedPlaylist?.id == playlist.id
+                        ) {
+                            selectedPlaylist = playlist
+                            Task { await loadTracksIfNeeded(for: playlist) }
                         }
-
-                        Divider().padding(.leading, 44)
-
-                        ForEach(playlists) { playlist in
-                            playlistButton(
-                                name: playlist.name,
-                                icon: playlist.isPublic ? "globe" : "lock.fill",
-                                count: playlist.trackCount,
-                                isSelected: selectedPlaylist?.id == playlist.id
-                            ) {
-                                selectedPlaylist = playlist
-                                Task { await loadTracksIfNeeded(for: playlist) }
-                            }
-                            if playlist.id != playlists.last?.id {
-                                Divider().padding(.leading, 44)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                Task { await unfollowPlaylist(playlist) }
+                            } label: {
+                                Label("Remove from Library", systemImage: "trash")
                             }
                         }
                     }
                 }
+                .listStyle(.plain)
             }
             .frame(maxHeight: .infinity)
             .background(.ultraThinMaterial)
@@ -199,6 +200,19 @@ struct PlaylistListView: View {
             trackCache[playlist.id] = tracks
         } catch {
             print("[Library] Track fetch failed for \(playlist.name): \(error.localizedDescription)")
+        }
+    }
+
+    private func unfollowPlaylist(_ playlist: SpotifyPlaylist) async {
+        do {
+            try await spotifyService.unfollowPlaylist(playlistID: playlist.id)
+            playlists.removeAll { $0.id == playlist.id }
+            trackCache.removeValue(forKey: playlist.id)
+            if selectedPlaylist?.id == playlist.id {
+                selectedPlaylist = nil
+            }
+        } catch {
+            print("[Library] Unfollow failed for \(playlist.name): \(error.localizedDescription)")
         }
     }
 }
