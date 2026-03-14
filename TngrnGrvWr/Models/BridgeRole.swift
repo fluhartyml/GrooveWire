@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 enum BridgeRole: String, Codable, Comparable {
     case host
@@ -24,6 +25,16 @@ enum BridgeRole: String, Codable, Comparable {
         case .bouncer: "shield.checkered"
         case .participant: "person.fill"
         case .listener: "headphones"
+        }
+    }
+
+    var roleColor: Color {
+        switch self {
+        case .host: .orange
+        case .cohost: .yellow
+        case .bouncer: .red
+        case .participant: .blue
+        case .listener: .secondary
         }
     }
 

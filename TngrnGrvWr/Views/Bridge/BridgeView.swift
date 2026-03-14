@@ -6,12 +6,19 @@ struct BridgeView: View {
 
     @Environment(SpotifyService.self) private var spotifyService
     @Environment(AppleMusicService.self) private var appleMusicService
+    @Environment(\.modelContext) private var modelContext
     @State private var showSearch = false
     @State private var showShare = false
     @State private var showRename = false
     @State private var renameText = ""
     @State private var isPlaying = false
     @State private var currentIndex = 0
+    @State private var isSavingPlaylist = false
+    @State private var savePlaylistMessage: String?
+    @State private var showDeleteConfirm = false
+    @State private var showMembers = false
+    @State private var showAddPlaylist = false
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         List {
@@ -48,55 +55,40 @@ struct BridgeView: View {
                             )
                         }
 
+                        if !bridge.tracks.isEmpty {
+                            Button {
+                                Task { await saveBridgeAsPlaylist() }
+                            } label: {
+                                Label("Save as Playlist", systemImage: "square.and.arrow.down.on.square")
+                            }
+                        }
+
+                        Button {
+                            showAddPlaylist = true
+                        } label: {
+                            Label("Add Playlist", systemImage: "text.badge.plus")
+                        }
+
                         Toggle("Private Bridge", isOn: Binding(
                             get: { !bridge.isPublic },
                             set: { bridge.isPublic = !$0 }
                         ))
 
-                        if bridge.guestCount > 0 {
-                            Divider()
-                            Menu("Members (\(bridge.participantCount))") {
-                                ForEach(bridge.membersByRole, id: \.role) { group in
-                                    Section(group.role.displayName) {
-                                        ForEach(group.userIDs, id: \.self) { userID in
-                                            if group.role == .host {
-                                                Label(userID.prefix(8) + "...", systemImage: group.role.iconName)
-                                            } else {
-                                                Menu("\(userID.prefix(8))...") {
-                                                    // Role changes
-                                                    if group.role != .cohost {
-                                                        Button {
-                                                            if let uuid = UUID(uuidString: userID) { bridge.promoteToCohost(uuid) }
-                                                        } label: { Label("Make Co-Host", systemImage: "crown") }
-                                                    }
-                                                    if group.role != .bouncer {
-                                                        Button {
-                                                            if let uuid = UUID(uuidString: userID) { bridge.promoteToBouncer(uuid) }
-                                                        } label: { Label("Make Bouncer", systemImage: "shield.checkered") }
-                                                    }
-                                                    if group.role != .participant {
-                                                        Button {
-                                                            if let uuid = UUID(uuidString: userID) { bridge.demoteToParticipant(uuid) }
-                                                        } label: { Label("Make Participant", systemImage: "person.fill") }
-                                                    }
-                                                    if group.role != .listener {
-                                                        Button {
-                                                            if let uuid = UUID(uuidString: userID) { bridge.demoteToListener(uuid) }
-                                                        } label: { Label("Make Listener", systemImage: "headphones") }
-                                                    }
-                                                    Divider()
-                                                    Button(role: .destructive) {
-                                                        if let uuid = UUID(uuidString: userID) { bridge.kick(uuid) }
-                                                    } label: { Label("Kick", systemImage: "hand.raised") }
-                                                    Button(role: .destructive) {
-                                                        if let uuid = UUID(uuidString: userID) { bridge.ban(uuid) }
-                                                    } label: { Label("Ban", systemImage: "xmark.shield") }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                        Divider()
+
+                        Button {
+                            showMembers = true
+                        } label: {
+                            Label("Members (\(bridge.participantCount))", systemImage: "person.2")
+                        }
+
+                        Divider()
+
+
+                        Button(role: .destructive) {
+                            showDeleteConfirm = true
+                        } label: {
+                            Label("Delete Bridge", systemImage: "trash")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -110,6 +102,12 @@ struct BridgeView: View {
         .sheet(isPresented: $showShare) {
             BridgeShareSheet(bridge: bridge)
         }
+        .sheet(isPresented: $showMembers) {
+            MembersSheet(bridge: bridge)
+        }
+        .sheet(isPresented: $showAddPlaylist) {
+            AddPlaylistToBridgeSheet(bridge: bridge)
+        }
         .alert("Rename Bridge", isPresented: $showRename) {
             TextField("Bridge name", text: $renameText)
             Button("Save") {
@@ -117,6 +115,24 @@ struct BridgeView: View {
                 if !name.isEmpty { bridge.name = name }
             }
             Button("Cancel", role: .cancel) { }
+        }
+        .alert("Save as Playlist", isPresented: Binding(
+            get: { savePlaylistMessage != nil },
+            set: { if !$0 { savePlaylistMessage = nil } }
+        )) {
+            Button("OK") { savePlaylistMessage = nil }
+        } message: {
+            Text(savePlaylistMessage ?? "")
+        }
+        .alert("Delete Bridge?", isPresented: $showDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                modelContext.delete(bridge)
+                try? modelContext.save()
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will permanently remove \"\(bridge.name)\" and all its tracks.")
         }
     }
 
@@ -212,6 +228,68 @@ struct BridgeView: View {
             try await spotifyService.play(track: track)
         } else if appleMusicService.isConnected {
             try await appleMusicService.play(track: track)
+        }
+    }
+
+    // MARK: - Save as Playlist
+
+    private func saveBridgeAsPlaylist() async {
+        guard !bridge.tracks.isEmpty else { return }
+        isSavingPlaylist = true
+        defer { isSavingPlaylist = false }
+
+        let playlistName = bridge.name
+        let trackIDs = bridge.tracks.compactMap { $0.spotifyID }
+
+        var spotifyPlaylistID: String?
+
+        // Create on Spotify if connected and we have Spotify track IDs
+        if spotifyService.isConnected, !trackIDs.isEmpty {
+            do {
+                let desc = "Saved from GrooveWire bridge"
+                spotifyPlaylistID = try await spotifyService.createPlaylist(
+                    name: playlistName,
+                    description: desc,
+                    trackIDs: trackIDs
+                )
+                print("[Bridge] Created Spotify playlist '\(playlistName)' with \(trackIDs.count) tracks")
+            } catch {
+                print("[Bridge] Spotify playlist creation failed: \(error.localizedDescription)")
+                // Continue — still save locally even if Spotify fails
+            }
+        }
+
+        // Save locally in SwiftData
+        let savedPlaylist = SavedPlaylist(
+            name: playlistName,
+            spotifyPlaylistID: spotifyPlaylistID,
+            playlistDescription: "Saved from bridge",
+            isPublic: bridge.isPublic
+        )
+        modelContext.insert(savedPlaylist)
+
+        for track in bridge.tracks {
+            let localTrack = Track(
+                title: track.title,
+                artist: track.artist,
+                albumTitle: track.albumTitle,
+                artworkURL: track.artworkURL,
+                spotifyID: track.spotifyID,
+                durationSeconds: track.durationSeconds,
+                addedBy: track.addedBy
+            )
+            localTrack.savedPlaylist = savedPlaylist
+            modelContext.insert(localTrack)
+            savedPlaylist.tracks.append(localTrack)
+        }
+
+        do {
+            try modelContext.save()
+            let spotifyNote = spotifyPlaylistID != nil ? " and Spotify" : ""
+            savePlaylistMessage = "Saved '\(playlistName)' with \(bridge.tracks.count) tracks to your library\(spotifyNote)!"
+            print("[Bridge] Saved playlist '\(playlistName)' locally with \(bridge.tracks.count) tracks")
+        } catch {
+            savePlaylistMessage = "Failed to save: \(error.localizedDescription)"
         }
     }
 
