@@ -108,11 +108,16 @@ struct OnboardingView: View {
             .padding(.horizontal, 32)
             .padding(.bottom, 40)
         }
-        .sheet(isPresented: $showSpotifyLogin) {
+        .sheet(isPresented: $showSpotifyLogin, onDismiss: {
+            // When the login sheet closes, check if auth succeeded
+            if spotifyService.isConnected && !importedFromSpotify {
+                Task { await importSpotifyProfile() }
+            }
+        }) {
             SpotifyLoginView(authManager: spotifyService.authManager)
         }
         .onChange(of: spotifyService.isConnected) { _, connected in
-            if connected {
+            if connected && !importedFromSpotify {
                 Task { await importSpotifyProfile() }
             }
         }
@@ -123,8 +128,10 @@ struct OnboardingView: View {
     }
 
     private func importSpotifyProfile() async {
+        print("[Onboarding] Fetching Spotify profile... isConnected=\(spotifyService.isConnected)")
         do {
             let profile = try await spotifyService.fetchProfile()
+            print("[Onboarding] Got profile: name=\(profile.displayName ?? "nil"), email=\(profile.email ?? "nil"), avatar=\(profile.avatarURL != nil ? "yes" : "nil")")
             if displayName.isEmpty, let name = profile.displayName {
                 displayName = name
             }
