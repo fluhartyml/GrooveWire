@@ -123,6 +123,14 @@ final class SpotifyAuthManager {
 
     private func parseTokenResponse(_ data: Data) throws {
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+
+        if let raw = String(data: data, encoding: .utf8) {
+            print("[SpotifyAuth] Token response: \(raw)")
+        }
+        if let scope = json?["scope"] as? String {
+            print("[SpotifyAuth] Granted scopes: \(scope)")
+        }
+
         guard let token = json?["access_token"] as? String,
               let expiresIn = json?["expires_in"] as? Int else {
             throw SpotifyAuthError.invalidTokenResponse

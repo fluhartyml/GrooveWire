@@ -98,16 +98,89 @@ final class SpotifyService: StreamingServiceProtocol {
         return allPlaylists
     }
 
+    func followPlaylist(playlistID: String) async throws {
+        let token = try await authManager.validToken()
+        let url = URL(string: "\(baseURL)/me/library")!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["ids": [playlistID]])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+    }
+
     func unfollowPlaylist(playlistID: String) async throws {
         let token = try await authManager.validToken()
-        let url = URL(string: "\(baseURL)/playlists/\(playlistID)/followers")!
+        let url = URL(string: "\(baseURL)/me/library")!
 
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["ids": [playlistID]])
 
-        let (_, response) = try await URLSession.shared.data(for: request)
-        try checkResponse(response)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response, data: data)
+    }
+
+    func createPlaylist(name: String, description: String? = nil, trackIDs: [String]) async throws -> String {
+        let token = try await authManager.validToken()
+
+        // Create the playlist via POST /me/playlists
+        let createURL = URL(string: "\(baseURL)/me/playlists")!
+        var createRequest = URLRequest(url: createURL)
+        createRequest.httpMethod = "POST"
+        createRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        createRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var body: [String: Any] = ["name": name, "public": false]
+        if let description { body["description"] = description }
+        createRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: createRequest)
+        print("[SpotifyService] createPlaylist HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+        try checkResponse(response, data: data)
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let playlistID = json["id"] as? String else {
+            throw SpotifyError.apiError(0)
+        }
+
+        // Add tracks in batches of 100 via POST /playlists/{id}/items
+        let uris = trackIDs.map { "spotify:track:\($0)" }
+        for batch in stride(from: 0, to: uris.count, by: 100) {
+            let slice = Array(uris[batch..<min(batch + 100, uris.count)])
+            let addURL = URL(string: "\(baseURL)/playlists/\(playlistID)/items")!
+            var addRequest = URLRequest(url: addURL)
+            addRequest.httpMethod = "POST"
+            addRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            addRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            addRequest.httpBody = try JSONSerialization.data(withJSONObject: ["uris": slice])
+
+            let (addData, addResponse) = try await URLSession.shared.data(for: addRequest)
+            try checkResponse(addResponse, data: addData)
+        }
+
+        return playlistID
+    }
+
+    /// Extract playlist ID from a Spotify URL like https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M
+    static func playlistID(from urlString: String) -> String? {
+        // Handle full URLs
+        if let url = URL(string: urlString),
+           url.host?.contains("spotify.com") == true,
+           url.pathComponents.count >= 3,
+           url.pathComponents[1] == "playlist" {
+            return url.pathComponents[2].components(separatedBy: "?").first
+        }
+        // Handle spotify:playlist:ID URIs
+        if urlString.hasPrefix("spotify:playlist:") {
+            return String(urlString.dropFirst("spotify:playlist:".count))
+        }
+        return nil
     }
 
     func fetchPlaylistTracks(playlistID: String) async throws -> [Track] {
@@ -295,14 +368,22 @@ final class SpotifyService: StreamingServiceProtocol {
         try checkResponse(response)
     }
 
-    private func checkResponse(_ response: URLResponse) throws {
+    private func checkResponse(_ response: URLResponse, data: Data? = nil) throws {
         guard let http = response as? HTTPURLResponse else { return }
         switch http.statusCode {
         case 200...299, 204: return
         case 401: throw SpotifyError.unauthorized
-        case 403: throw SpotifyError.premiumRequired
+        case 403:
+            if let data, let body = String(data: data, encoding: .utf8) {
+                print("[SpotifyService] 403 response body: \(body)")
+            }
+            throw SpotifyError.forbidden
         case 429: throw SpotifyError.rateLimited
-        default: throw SpotifyError.apiError(http.statusCode)
+        default:
+            if let data, let body = String(data: data, encoding: .utf8) {
+                print("[SpotifyService] HTTP \(http.statusCode) response body: \(body)")
+            }
+            throw SpotifyError.apiError(http.statusCode)
         }
     }
 
@@ -385,6 +466,7 @@ struct SpotifyProfile {
 enum SpotifyError: LocalizedError {
     case unauthorized
     case premiumRequired
+    case forbidden
     case rateLimited
     case apiError(Int)
 
@@ -392,6 +474,7 @@ enum SpotifyError: LocalizedError {
         switch self {
         case .unauthorized: "Spotify session expired. Please reconnect."
         case .premiumRequired: "Spotify Premium is required for playback control."
+        case .forbidden: "Spotify denied this request (403). Check the console for details."
         case .rateLimited: "Too many requests. Please wait a moment."
         case .apiError(let code): "Spotify API error (HTTP \(code))"
         }
