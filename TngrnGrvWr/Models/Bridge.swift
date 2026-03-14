@@ -180,23 +180,49 @@ final class Bridge {
 
     // MARK: - Vote-Sorted Queue
 
-    /// Returns upcoming tracks sorted by vote weight.
-    /// Pinned first → highest voteScore → normal → lowest voteScore → buried last.
-    /// Ties preserve original add order (stable sort).
+    /// Returns upcoming tracks with vote-based nudging.
+    /// Each vote point moves a track one position from its original spot.
+    /// Pinned tracks jump to front, buried tracks drop to back.
     func sortedUpcoming(after index: Int) -> [Track] {
         let allTracks = trackList
         guard allTracks.count > index + 1 else { return [] }
         let upcoming = Array(allTracks[(index + 1)...])
 
-        return upcoming.sorted { a, b in
-            // Pinned tracks always first
-            if a.isPinned != b.isPinned { return a.isPinned }
-            // Buried tracks always last
-            if a.isBuried != b.isBuried { return b.isBuried }
-            // Higher vote score comes first
-            if a.voteScore != b.voteScore { return a.voteScore > b.voteScore }
-            // Tie: preserve original order (earlier addedAt first)
-            return a.addedAt < b.addedAt
+        // Start with original order
+        var result = upcoming.sorted { $0.addedAt < $1.addedAt }
+
+        // Pull out pinned and buried tracks
+        let pinned = result.filter { $0.isPinned }
+        let buried = result.filter { $0.isBuried }
+        result.removeAll { $0.isPinned || $0.isBuried }
+
+        // Nudge by vote score: positive votes bubble up, negative sink down.
+        // Each vote point = one swap, so a single downvote only drops one spot.
+        var changed = true
+        while changed {
+            changed = false
+            for i in 0..<result.count {
+                let track = result[i]
+                // Nudge up: if score > 0 and not already at top, swap with neighbor above
+                if track.voteScore > 0 && i > 0 {
+                    let neighbor = result[i - 1]
+                    if track.voteScore > neighbor.voteScore {
+                        result.swapAt(i, i - 1)
+                        changed = true
+                    }
+                }
+                // Nudge down: if score < 0 and not already at bottom, swap with neighbor below
+                if track.voteScore < 0 && i < result.count - 1 {
+                    let neighbor = result[i + 1]
+                    if track.voteScore < neighbor.voteScore {
+                        result.swapAt(i, i + 1)
+                        changed = true
+                    }
+                }
+            }
         }
+
+        // Pinned at front, buried at back
+        return pinned + result + buried
     }
 }
