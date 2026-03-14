@@ -20,6 +20,7 @@ struct TngrnGrvWrApp: App {
             Bridge.self,
             Track.self,
             Message.self,
+            SavedPlaylist.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

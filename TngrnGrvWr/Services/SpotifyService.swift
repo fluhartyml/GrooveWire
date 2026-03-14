@@ -64,10 +64,18 @@ final class SpotifyService: StreamingServiceProtocol {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
             let (data, response) = try await URLSession.shared.data(for: request)
+            let plStatus = (response as? HTTPURLResponse)?.statusCode ?? 0
+            print("[SpotifyService] fetchPlaylists HTTP \(plStatus)")
+            if plStatus != 200 {
+                let body = String(data: data, encoding: .utf8) ?? "no body"
+                print("[SpotifyService] fetchPlaylists error: \(body)")
+            }
             try checkResponse(response)
 
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let items = json["items"] as? [[String: Any]] else { break }
+
+            print("[SpotifyService] fetchPlaylists found \(items.count) playlists in this page")
 
             let playlists = items.compactMap { item -> SpotifyPlaylist? in
                 guard let id = item["id"] as? String,
@@ -100,30 +108,31 @@ final class SpotifyService: StreamingServiceProtocol {
 
     func followPlaylist(playlistID: String) async throws {
         let token = try await authManager.validToken()
-        let url = URL(string: "\(baseURL)/me/library")!
+        let url = URL(string: "\(baseURL)/playlists/\(playlistID)/followers")!
 
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["ids": [playlistID]])
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try checkResponse(response, data: data)
+        let (_, response) = try await URLSession.shared.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        print("[SpotifyService] followPlaylist HTTP \(status)")
+        try checkResponse(response)
     }
 
     func unfollowPlaylist(playlistID: String) async throws {
         let token = try await authManager.validToken()
-        let url = URL(string: "\(baseURL)/me/library")!
+        let url = URL(string: "\(baseURL)/playlists/\(playlistID)/followers")!
 
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["ids": [playlistID]])
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        try checkResponse(response, data: data)
+        let (_, response) = try await URLSession.shared.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        print("[SpotifyService] unfollowPlaylist HTTP \(status)")
+        try checkResponse(response)
     }
 
     func createPlaylist(name: String, description: String? = nil, trackIDs: [String]) async throws -> String {
@@ -161,6 +170,12 @@ final class SpotifyService: StreamingServiceProtocol {
             addRequest.httpBody = try JSONSerialization.data(withJSONObject: ["uris": slice])
 
             let (addData, addResponse) = try await URLSession.shared.data(for: addRequest)
+            let addStatus = (addResponse as? HTTPURLResponse)?.statusCode ?? 0
+            print("[SpotifyService] addTracks batch HTTP \(addStatus)")
+            if addStatus != 201 {
+                let body = String(data: addData, encoding: .utf8) ?? "no body"
+                print("[SpotifyService] addTracks response: \(body)")
+            }
             try checkResponse(addResponse, data: addData)
         }
 
@@ -194,6 +209,12 @@ final class SpotifyService: StreamingServiceProtocol {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
             let (data, response) = try await URLSession.shared.data(for: request)
+            let trackStatus = (response as? HTTPURLResponse)?.statusCode ?? 0
+            print("[SpotifyService] fetchPlaylistTracks HTTP \(trackStatus) for playlist \(playlistID)")
+            if trackStatus != 200 {
+                let body = String(data: data, encoding: .utf8) ?? "no body"
+                print("[SpotifyService] fetchPlaylistTracks error: \(body)")
+            }
             try checkResponse(response)
 
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],

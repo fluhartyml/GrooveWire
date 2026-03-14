@@ -6,29 +6,26 @@ struct PlaylistListView: View {
     @Environment(SpotifyService.self) private var spotifyService
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Bridge.createdAt, order: .reverse) private var bridges: [Bridge]
-    @State private var playlists: [SpotifyPlaylist] = []
-    @State private var selectedPlaylist: SpotifyPlaylist?
-    @State private var trackCache: [String: [Track]] = [:]  // playlistID → tracks
-    @State private var isLoadingPlaylists = false
-    @State private var isLoadingTracks = false
+    @Query(sort: \SavedPlaylist.createdAt, order: .reverse) private var savedPlaylists: [SavedPlaylist]
+    @State private var selectedPlaylist: SavedPlaylist?
     @State private var showBridgePicker = false
     @State private var showAddPlaylist = false
 
     // All tracks for the selected playlist, or all playlists combined
     private var displayedTracks: [Track] {
         if let selected = selectedPlaylist {
-            return trackCache[selected.id] ?? []
+            return selected.tracks
         }
-        // "All Songs" — flatten every cached playlist
-        return playlists.flatMap { trackCache[$0.id] ?? [] }
+        // "All Songs" — flatten every saved playlist
+        return savedPlaylists.flatMap { $0.tracks }
     }
 
     private var trackSectionTitle: String {
         if let selected = selectedPlaylist {
-            return "\(selected.name) (\(displayedTracks.count) tracks)"
+            return "\(selected.name) (\(selected.trackCount) tracks)"
         }
-        let cached = trackCache.values.reduce(0) { $0 + $1.count }
-        return "All Songs (\(cached) tracks)"
+        let total = savedPlaylists.reduce(0) { $0 + $1.trackCount }
+        return "All Songs (\(total) tracks)"
     }
 
     var body: some View {
@@ -41,12 +38,6 @@ struct PlaylistListView: View {
                         .padding(.horizontal)
                         .padding(.top, 8)
                     Spacer()
-                    if isLoadingPlaylists {
-                        ProgressView()
-                            .controlSize(.small)
-                            .padding(.trailing)
-                            .padding(.top, 8)
-                    }
                 }
 
                 List {
@@ -55,7 +46,7 @@ struct PlaylistListView: View {
                         selectedPlaylist = nil
                     }
 
-                    ForEach(playlists) { playlist in
+                    ForEach(savedPlaylists) { playlist in
                         playlistButton(
                             name: playlist.name,
                             icon: playlist.isPublic ? "globe" : "lock.fill",
@@ -63,20 +54,21 @@ struct PlaylistListView: View {
                             isSelected: selectedPlaylist?.id == playlist.id
                         ) {
                             selectedPlaylist = playlist
-                            Task { await loadTracksIfNeeded(for: playlist) }
                         }
                         .contextMenu {
-                            ShareLink(
-                                item: URL(string: "https://open.spotify.com/playlist/\(playlist.id)")!,
-                                preview: SharePreview(playlist.name, image: Image(systemName: "music.note.list"))
-                            ) {
-                                Label("Share Spotify Link", systemImage: "square.and.arrow.up")
+                            if let spotifyID = playlist.spotifyPlaylistID {
+                                ShareLink(
+                                    item: URL(string: "https://open.spotify.com/playlist/\(spotifyID)")!,
+                                    preview: SharePreview(playlist.name, image: Image(systemName: "music.note.list"))
+                                ) {
+                                    Label("Share Spotify Link", systemImage: "square.and.arrow.up")
+                                }
+
+                                Divider()
                             }
 
-                            Divider()
-
                             Button(role: .destructive) {
-                                Task { await unfollowPlaylist(playlist) }
+                                deletePlaylist(playlist)
                             } label: {
                                 Label("Remove from Library", systemImage: "trash")
                             }
@@ -108,15 +100,9 @@ struct PlaylistListView: View {
                         .padding(.trailing)
                         .padding(.top, 8)
                     }
-                    if isLoadingTracks {
-                        ProgressView()
-                            .controlSize(.small)
-                            .padding(.trailing)
-                            .padding(.top, 8)
-                    }
                 }
 
-                if displayedTracks.isEmpty && !isLoadingTracks {
+                if displayedTracks.isEmpty {
                     VStack {
                         Spacer()
                         Text("Select a playlist above")
@@ -136,31 +122,15 @@ struct PlaylistListView: View {
         .navigationTitle("My Library")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                HStack(spacing: 12) {
-                    Button {
-                        showAddPlaylist = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-
-                    Button {
-                        Task { await loadPlaylists() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .disabled(isLoadingPlaylists)
+                Button {
+                    showAddPlaylist = true
+                } label: {
+                    Image(systemName: "plus")
                 }
             }
         }
-        .task {
-            if playlists.isEmpty {
-                await loadPlaylists()
-            }
-        }
         .sheet(isPresented: $showAddPlaylist) {
-            AddPlaylistSheet(spotifyService: spotifyService) {
-                Task { await loadPlaylists() }
-            }
+            AddPlaylistSheet(spotifyService: spotifyService) {}
         }
         .sheet(isPresented: $showBridgePicker) {
             BridgePickerSheet(tracks: displayedTracks, bridges: bridges) { bridge in
@@ -203,51 +173,22 @@ struct PlaylistListView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Data Loading
+    // MARK: - Actions
 
-    private func loadPlaylists() async {
-        isLoadingPlaylists = true
-        defer { isLoadingPlaylists = false }
-        do {
-            playlists = try await spotifyService.fetchPlaylists()
-        } catch {
-            print("[Library] Playlist fetch failed: \(error.localizedDescription)")
-        }
-    }
-
-    private func loadTracksIfNeeded(for playlist: SpotifyPlaylist) async {
-        guard trackCache[playlist.id] == nil else { return }
-        isLoadingTracks = true
-        defer { isLoadingTracks = false }
-        do {
-            let tracks = try await spotifyService.fetchPlaylistTracks(playlistID: playlist.id)
-            trackCache[playlist.id] = tracks
-        } catch {
-            print("[Library] Track fetch failed for \(playlist.name): \(error.localizedDescription)")
-        }
-    }
-
-    private func followPlaylist(from urlString: String) async {
-        guard let playlistID = SpotifyService.playlistID(from: urlString) else { return }
-        do {
-            try await spotifyService.followPlaylist(playlistID: playlistID)
-            await loadPlaylists()
-        } catch {
-            print("[Library] Follow playlist failed: \(error.localizedDescription)")
-        }
-    }
-
-    private func unfollowPlaylist(_ playlist: SpotifyPlaylist) async {
-        do {
-            try await spotifyService.unfollowPlaylist(playlistID: playlist.id)
-            playlists.removeAll { $0.id == playlist.id }
-            trackCache.removeValue(forKey: playlist.id)
-            if selectedPlaylist?.id == playlist.id {
-                selectedPlaylist = nil
+    private func deletePlaylist(_ playlist: SavedPlaylist) {
+        // Also unfollow on Spotify if we have an ID
+        if let spotifyID = playlist.spotifyPlaylistID {
+            Task {
+                try? await spotifyService.unfollowPlaylist(playlistID: spotifyID)
             }
-        } catch {
-            print("[Library] Unfollow failed for \(playlist.name): \(error.localizedDescription)")
         }
+
+        if selectedPlaylist?.id == playlist.id {
+            selectedPlaylist = nil
+        }
+        modelContext.delete(playlist)
+        try? modelContext.save()
+        print("[Library] Deleted playlist '\(playlist.name)' from local library")
     }
 }
 
@@ -263,6 +204,7 @@ struct AddPlaylistSheet: View {
     let spotifyService: SpotifyService
     let onAdded: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @State private var mode: AddPlaylistMode = .link
 
     // Link mode
@@ -438,6 +380,18 @@ struct AddPlaylistSheet: View {
         errorMessage = nil
         do {
             try await spotifyService.followPlaylist(playlistID: playlistID)
+
+            // Save locally — we don't have track data for linked playlists yet,
+            // but we save the shell so it appears in the library
+            let savedPlaylist = SavedPlaylist(
+                name: "Spotify Playlist",
+                spotifyPlaylistID: playlistID,
+                isPublic: true
+            )
+            modelContext.insert(savedPlaylist)
+            try modelContext.save()
+            print("[Library] Saved linked playlist locally")
+
             onAdded()
             dismiss()
         } catch {
@@ -456,7 +410,7 @@ struct AddPlaylistSheet: View {
 
         isLoading = true
         errorMessage = nil
-        var foundIDs: [String] = []
+        var foundTracks: [Track] = []
         var notFound: [String] = []
 
         for (index, entry) in songEntries.enumerated() {
@@ -464,8 +418,8 @@ struct AddPlaylistSheet: View {
 
             do {
                 let results = try await spotifyService.search(query: "\(entry.title) \(entry.artist)")
-                if let match = results.first, let spotifyID = match.spotifyID {
-                    foundIDs.append(spotifyID)
+                if let match = results.first {
+                    foundTracks.append(match)
                 } else {
                     notFound.append("\(entry.title) — \(entry.artist)")
                 }
@@ -474,18 +428,47 @@ struct AddPlaylistSheet: View {
             }
         }
 
-        if foundIDs.isEmpty {
+        if foundTracks.isEmpty {
             errorMessage = "Couldn't find any of those songs on Spotify."
             isLoading = false
             return
         }
 
-        statusMessage = "Creating playlist with \(foundIDs.count) tracks..."
+        let trackIDs = foundTracks.compactMap { $0.spotifyID }
+
+        statusMessage = "Creating playlist with \(trackIDs.count) tracks..."
 
         do {
             let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
             let desc = "Created by GrooveWire"
-            _ = try await spotifyService.createPlaylist(name: trimmedName, description: desc, trackIDs: foundIDs)
+            let spotifyPlaylistID = try await spotifyService.createPlaylist(name: trimmedName, description: desc, trackIDs: trackIDs)
+
+            // Save locally in SwiftData
+            let savedPlaylist = SavedPlaylist(
+                name: trimmedName,
+                spotifyPlaylistID: spotifyPlaylistID,
+                playlistDescription: desc,
+                isPublic: false
+            )
+            modelContext.insert(savedPlaylist)
+
+            for track in foundTracks {
+                let localTrack = Track(
+                    title: track.title,
+                    artist: track.artist,
+                    albumTitle: track.albumTitle,
+                    artworkURL: track.artworkURL,
+                    spotifyID: track.spotifyID,
+                    durationSeconds: track.durationSeconds,
+                    addedBy: UUID()
+                )
+                localTrack.savedPlaylist = savedPlaylist
+                modelContext.insert(localTrack)
+                savedPlaylist.tracks.append(localTrack)
+            }
+
+            try modelContext.save()
+            print("[Library] Saved playlist '\(trimmedName)' locally with \(foundTracks.count) tracks")
 
             if !notFound.isEmpty {
                 statusMessage = "Created! \(notFound.count) song(s) not found: \(notFound.joined(separator: ", "))"

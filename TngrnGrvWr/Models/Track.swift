@@ -15,6 +15,7 @@ final class Track {
     var addedAt: Date
 
     var bridge: Bridge?
+    var savedPlaylist: SavedPlaylist?
 
     init(
         id: UUID = UUID(),
