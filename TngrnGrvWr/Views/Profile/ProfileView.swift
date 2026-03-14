@@ -69,6 +69,18 @@ struct ProfileView: View {
                 }
             }
 
+            if spotifyService.isConnected {
+                Section {
+                    NavigationLink(destination: PlaylistListView()) {
+                        Label("My Library", systemImage: "rectangle.split.1x2")
+                    }
+                } header: {
+                    Text("Spotify Library")
+                } footer: {
+                    Text("Browse your playlists and songs. Load them into a bridge for your listening party.")
+                }
+            }
+
             Section("About") {
                 Label("Tangerine GrooveWire", systemImage: "antenna.radiowaves.left.and.right")
             }

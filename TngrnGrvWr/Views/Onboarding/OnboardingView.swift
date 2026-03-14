@@ -153,9 +153,12 @@ struct OnboardingView: View {
             displayName: name,
             email: email.isEmpty ? nil : email.trimmingCharacters(in: .whitespaces),
             phoneNumber: phone.isEmpty ? nil : phone.trimmingCharacters(in: .whitespaces),
+            streamingService: importedFromSpotify ? .spotify : .none,
             avatarURL: avatarURL
         )
         modelContext.insert(user)
+        try? modelContext.save()
+        print("[Onboarding] User saved: \(user.displayName), email=\(user.email ?? "nil"), avatar=\(user.avatarURL != nil ? "yes" : "nil")")
         onComplete()
     }
 }

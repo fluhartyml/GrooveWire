@@ -13,6 +13,7 @@ final class SpotifyAuthManager {
         "user-modify-playback-state",
         "user-read-currently-playing",
         "user-read-email",
+        "playlist-read-private",
         "playlist-modify-public",
         "playlist-modify-private"
     ].joined(separator: " ")

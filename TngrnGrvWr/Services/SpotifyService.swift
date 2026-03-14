@@ -51,6 +51,99 @@ final class SpotifyService: StreamingServiceProtocol {
         )
     }
 
+    // MARK: - Playlists
+
+    func fetchPlaylists() async throws -> [SpotifyPlaylist] {
+        let token = try await authManager.validToken()
+        var allPlaylists: [SpotifyPlaylist] = []
+        var nextURL: String? = "\(baseURL)/me/playlists?limit=50"
+
+        while let urlString = nextURL {
+            let url = URL(string: urlString)!
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            try checkResponse(response)
+
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let items = json["items"] as? [[String: Any]] else { break }
+
+            let playlists = items.compactMap { item -> SpotifyPlaylist? in
+                guard let id = item["id"] as? String,
+                      let name = item["name"] as? String else { return nil }
+                let description = item["description"] as? String
+                let trackInfo = item["tracks"] as? [String: Any]
+                let trackCount = trackInfo?["total"] as? Int ?? 0
+                let images = item["images"] as? [[String: Any]]
+                let imageURL = images?.first?["url"] as? String
+                let isPublic = item["public"] as? Bool ?? false
+                let owner = item["owner"] as? [String: Any]
+                let ownerName = owner?["display_name"] as? String
+
+                return SpotifyPlaylist(
+                    id: id,
+                    name: name,
+                    description: description,
+                    trackCount: trackCount,
+                    imageURL: imageURL,
+                    isPublic: isPublic,
+                    ownerName: ownerName
+                )
+            }
+            allPlaylists.append(contentsOf: playlists)
+            nextURL = json["next"] as? String
+        }
+
+        return allPlaylists
+    }
+
+    func fetchPlaylistTracks(playlistID: String) async throws -> [Track] {
+        let token = try await authManager.validToken()
+        var allTracks: [Track] = []
+        var nextURL: String? = "\(baseURL)/playlists/\(playlistID)/tracks?limit=100"
+
+        while let urlString = nextURL {
+            let url = URL(string: urlString)!
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            try checkResponse(response)
+
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let items = json["items"] as? [[String: Any]] else { break }
+
+            let tracks = items.compactMap { item -> Track? in
+                guard let trackData = item["track"] as? [String: Any],
+                      let id = trackData["id"] as? String,
+                      let name = trackData["name"] as? String,
+                      let durationMs = trackData["duration_ms"] as? Int,
+                      let artists = trackData["artists"] as? [[String: Any]],
+                      let artistName = artists.first?["name"] as? String else { return nil }
+
+                let album = trackData["album"] as? [String: Any]
+                let albumName = album?["name"] as? String
+                let images = album?["images"] as? [[String: Any]]
+                let artworkURL = images?.first?["url"] as? String
+
+                return Track(
+                    title: name,
+                    artist: artistName,
+                    albumTitle: albumName,
+                    artworkURL: artworkURL,
+                    spotifyID: id,
+                    durationSeconds: Double(durationMs) / 1000.0,
+                    addedBy: UUID()
+                )
+            }
+            allTracks.append(contentsOf: tracks)
+            nextURL = json["next"] as? String
+        }
+
+        return allTracks
+    }
+
     // MARK: - Devices
 
     func fetchDevices() async throws {
@@ -252,6 +345,18 @@ struct SpotifyDevice: Identifiable {
         default: return "speaker.wave.2"
         }
     }
+}
+
+// MARK: - Playlist
+
+struct SpotifyPlaylist: Identifiable {
+    let id: String
+    let name: String
+    let description: String?
+    let trackCount: Int
+    let imageURL: String?
+    let isPublic: Bool
+    let ownerName: String?
 }
 
 // MARK: - Profile
