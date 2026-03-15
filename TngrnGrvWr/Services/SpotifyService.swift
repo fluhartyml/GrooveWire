@@ -320,7 +320,16 @@ final class SpotifyService: StreamingServiceProtocol {
     // MARK: - Playback
 
     func play(track: Track) async throws {
-        guard let spotifyID = track.spotifyID else { return }
+        guard let spotifyID = track.spotifyID else {
+            print("[Spotify] Track '\(track.title)' has no Spotify ID — skipping")
+            return
+        }
+
+        // Auto-fetch devices if none selected
+        if selectedDeviceID == nil {
+            try await fetchDevices()
+        }
+
         let token = try await authManager.validToken()
 
         var urlString = "\(baseURL)/me/player/play"
@@ -337,7 +346,30 @@ final class SpotifyService: StreamingServiceProtocol {
         let body = ["uris": ["spotify:track:\(spotifyID)"]]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        // If 404 (no active device), refresh devices and retry once
+        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 404 {
+            print("[Spotify] 404 — refreshing devices and retrying")
+            try await fetchDevices()
+            guard selectedDeviceID != nil else {
+                print("[Spotify] No devices available — open Spotify on a device first")
+                throw SpotifyError.apiError(statusCode: 404)
+            }
+
+            // Retry with the newly selected device
+            let retryURL = URL(string: "\(baseURL)/me/player/play?device_id=\(selectedDeviceID!)")!
+            var retryRequest = URLRequest(url: retryURL)
+            retryRequest.httpMethod = "PUT"
+            retryRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            retryRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            retryRequest.httpBody = request.httpBody
+
+            let (_, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+            try checkResponse(retryResponse)
+            return
+        }
+
         try checkResponse(response)
     }
 

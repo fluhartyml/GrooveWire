@@ -65,48 +65,70 @@ struct BridgeListView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(playlists) { playlist in
-                        DisclosureGroup(
-                            isExpanded: Binding(
-                                get: { expandedPlaylists.contains(playlist.id) },
-                                set: { isExpanded in
-                                    if isExpanded {
-                                        expandedPlaylists.insert(playlist.id)
-                                    } else {
-                                        expandedPlaylists.remove(playlist.id)
-                                    }
+                        // Playlist header row with play button
+                        HStack(spacing: 12) {
+                            Button {
+                                if expandedPlaylists.contains(playlist.id) {
+                                    expandedPlaylists.remove(playlist.id)
+                                } else {
+                                    expandedPlaylists.insert(playlist.id)
                                 }
-                            )
-                        ) {
+                            } label: {
+                                Image(systemName: expandedPlaylists.contains(playlist.id) ? "chevron.down" : "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 16)
+                            }
+                            .buttonStyle(.plain)
+
+                            Image(systemName: "music.note.list")
+                                .font(.title3)
+                                .foregroundStyle(.orange)
+                                .frame(width: 32)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(playlist.name)
+                                    .font(.subheadline)
+                                Text("\(playlist.trackCount) tracks")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            if playlist.spotifyPlaylistID != nil {
+                                Image(systemName: "dot.radiowaves.left.and.right")
+                                    .font(.caption2)
+                                    .foregroundStyle(.green)
+                            }
+
+                            if !playlist.trackList.isEmpty {
+                                Button {
+                                    playbackManager.play(
+                                        track: playlist.trackList[0],
+                                        from: playlist.trackList
+                                    )
+                                } label: {
+                                    Image(systemName: "play.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(.orange)
+                                }
+                                .buttonStyle(.plain)
+                                .help("Play playlist")
+                            }
+                        }
+
+                        // Expanded tracks
+                        if expandedPlaylists.contains(playlist.id) {
                             if playlist.trackList.isEmpty {
                                 Text("No tracks")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                                    .padding(.leading, 60)
                             } else {
                                 ForEach(playlist.trackList) { track in
                                     trackPlayRow(track: track, queue: playlist.trackList)
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "music.note.list")
-                                    .font(.title3)
-                                    .foregroundStyle(.orange)
-                                    .frame(width: 32)
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(playlist.name)
-                                        .font(.subheadline)
-                                    Text("\(playlist.trackCount) tracks")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                Spacer()
-
-                                if playlist.spotifyPlaylistID != nil {
-                                    Image(systemName: "dot.radiowaves.left.and.right")
-                                        .font(.caption2)
-                                        .foregroundStyle(.green)
+                                        .padding(.leading, 48)
                                 }
                             }
                         }

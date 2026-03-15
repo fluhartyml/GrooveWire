@@ -31,7 +31,15 @@ final class PlaybackManager {
 
         Task {
             do {
-                try await activeService?.play(track: track)
+                if let service = activeService {
+                    print("[PlaybackManager] Playing '\(track.title)' via \(service is SpotifyService ? "Spotify" : "Apple Music")")
+                    try await service.play(track: track)
+                    print("[PlaybackManager] Play command sent successfully")
+                } else {
+                    print("[PlaybackManager] No active service — cannot play")
+                    isPlaying = false
+                    stopPolling()
+                }
             } catch {
                 print("[PlaybackManager] Play failed: \(error.localizedDescription)")
                 isPlaying = false
