@@ -5,14 +5,12 @@ struct BridgeView: View {
     let bridge: Bridge
 
     @Environment(SpotifyService.self) private var spotifyService
-    @Environment(AppleMusicService.self) private var appleMusicService
+    @Environment(PlaybackManager.self) private var playbackManager
     @Environment(\.modelContext) private var modelContext
     @State private var showSearch = false
     @State private var showShare = false
     @State private var showRename = false
     @State private var renameText = ""
-    @State private var isPlaying = false
-    @State private var currentIndex = 0
     @State private var isSavingPlaylist = false
     @State private var savePlaylistMessage: String?
     @State private var showDeleteConfirm = false
@@ -138,17 +136,12 @@ struct BridgeView: View {
 
     // MARK: - Sections
 
-    private var currentTrack: Track? {
-        guard !bridge.trackList.isEmpty, currentIndex < bridge.trackList.count else { return nil }
-        return bridge.trackList[currentIndex]
-    }
-
     @ViewBuilder
     private var nowPlayingSection: some View {
         Section("Now Playing") {
-            if let track = currentTrack {
+            if let track = playbackManager.currentTrack {
                 NowPlayingRow(track: track)
-                playbackControls(for: track)
+                playbackControls
             } else {
                 Text("Nothing playing")
                     .foregroundStyle(.secondary)
@@ -158,7 +151,7 @@ struct BridgeView: View {
 
     @ViewBuilder
     private var queueSection: some View {
-        let upcoming = bridge.sortedUpcoming(after: currentIndex)
+        let upcoming = bridge.sortedUpcoming(after: playbackManager.currentIndex)
         Section("Up Next (\(upcoming.count))") {
             if upcoming.isEmpty {
                 Text("Queue is empty — tap + to add tracks")
@@ -171,6 +164,9 @@ struct BridgeView: View {
                         onVoteUp: { track.vote(userID: bridge.hostID, isUpvote: true) },
                         onVoteDown: { track.vote(userID: bridge.hostID, isUpvote: false) }
                     )
+                    .onTapGesture {
+                        playbackManager.play(track: track, from: bridge.trackList)
+                    }
                     .swipeActions(edge: .trailing) {
                         Button {
                             track.vote(userID: bridge.hostID, isUpvote: false)
@@ -231,59 +227,31 @@ struct BridgeView: View {
     // MARK: - Playback
 
     @ViewBuilder
-    private func playbackControls(for track: Track) -> some View {
+    private var playbackControls: some View {
         HStack(spacing: 32) {
             Spacer()
 
-            Button { skipBackward() } label: {
+            Button { playbackManager.skipBackward() } label: {
                 Image(systemName: "backward.fill")
                     .font(.title2)
             }
-            .disabled(currentIndex == 0)
+            .disabled(!playbackManager.canSkipBackward)
 
-            Button { togglePlayback(track: track) } label: {
-                Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+            Button { playbackManager.togglePlayback() } label: {
+                Image(systemName: playbackManager.isPlaying ? "pause.circle.fill" : "play.circle.fill")
                     .font(.system(size: 44))
             }
 
-            Button { skipForward() } label: {
+            Button { playbackManager.skipForward() } label: {
                 Image(systemName: "forward.fill")
                     .font(.title2)
             }
-            .disabled(currentIndex >= bridge.trackList.count - 1)
+            .disabled(!playbackManager.canSkipForward)
 
             Spacer()
         }
         .buttonStyle(.plain)
         .listRowBackground(Color.clear)
-    }
-
-    private func skipForward() {
-        guard currentIndex < bridge.trackList.count - 1 else { return }
-        currentIndex += 1
-        if isPlaying, let track = currentTrack {
-            Task {
-                try? await playTrack(track)
-            }
-        }
-    }
-
-    private func skipBackward() {
-        guard currentIndex > 0 else { return }
-        currentIndex -= 1
-        if isPlaying, let track = currentTrack {
-            Task {
-                try? await playTrack(track)
-            }
-        }
-    }
-
-    private func playTrack(_ track: Track) async throws {
-        if spotifyService.isConnected {
-            try await spotifyService.play(track: track)
-        } else if appleMusicService.isConnected {
-            try await appleMusicService.play(track: track)
-        }
     }
 
     // MARK: - Save as Playlist
@@ -348,28 +316,6 @@ struct BridgeView: View {
         }
     }
 
-    private func togglePlayback(track: Track) {
-        Task {
-            do {
-                if isPlaying {
-                    if spotifyService.isConnected {
-                        try await spotifyService.pause()
-                    } else if appleMusicService.isConnected {
-                        try await appleMusicService.pause()
-                    }
-                } else {
-                    if spotifyService.isConnected {
-                        try await spotifyService.play(track: track)
-                    } else if appleMusicService.isConnected {
-                        try await appleMusicService.play(track: track)
-                    }
-                }
-                isPlaying.toggle()
-            } catch {
-                print("Playback error: \(error.localizedDescription)")
-            }
-        }
-    }
 }
 
 // MARK: - Now Playing Row

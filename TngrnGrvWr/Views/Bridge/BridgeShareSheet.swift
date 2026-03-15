@@ -1,9 +1,19 @@
 import SwiftUI
+import SwiftData
 
 struct BridgeShareSheet: View {
     let bridge: Bridge
     @Environment(\.dismiss) private var dismiss
+    @Query private var users: [User]
     @State private var copied = false
+    @State private var inviteeBirthday = Calendar.current.date(byAdding: .year, value: -18, to: Date()) ?? Date()
+    @State private var hasPickedBirthday = false
+
+    private var currentUser: User? { users.first }
+
+    private var inviteeAgeCategory: AgeCategory {
+        User.computeAgeCategory(from: inviteeBirthday)
+    }
 
     private var inviteLink: String {
         "tngrnGrvWr://bridge/\(bridge.id.uuidString)"
@@ -21,6 +31,27 @@ struct BridgeShareSheet: View {
 
                 BridgeTradingCard(bridge: bridge)
                     .padding()
+
+                // Invitee birthday collection
+                GroupBox("Invitee Info") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        DatePicker(
+                            "Invitee's Birthday",
+                            selection: $inviteeBirthday,
+                            in: ...Date(),
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.compact)
+                        .onChange(of: inviteeBirthday) { _, _ in
+                            hasPickedBirthday = true
+                        }
+
+                        if hasPickedBirthday {
+                            inviteeAgeNotice
+                        }
+                    }
+                }
+                .padding(.horizontal)
 
                 GroupBox("Invite Link") {
                     HStack {
@@ -57,10 +88,11 @@ struct BridgeShareSheet: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(.orange)
+                        .background(hasPickedBirthday ? .orange : .gray)
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
+                .disabled(!hasPickedBirthday)
                 .padding(.horizontal)
 
                 Spacer()
@@ -70,6 +102,26 @@ struct BridgeShareSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var inviteeAgeNotice: some View {
+        switch inviteeAgeCategory {
+        case .child:
+            Label("Under 13 — they will be anonymous in the bridge", systemImage: "lock.fill")
+                .font(.caption)
+                .foregroundStyle(.orange)
+        case .teen:
+            Label("13-17 — private by default, screen name hidden unless they have parental consent", systemImage: "lock.fill")
+                .font(.caption)
+                .foregroundStyle(.blue)
+        case .adult:
+            Label("18+ — full profile visibility", systemImage: "checkmark.circle")
+                .font(.caption)
+                .foregroundStyle(.green)
+        case .unknown:
+            EmptyView()
         }
     }
 }

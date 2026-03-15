@@ -2,20 +2,127 @@ import SwiftUI
 import SwiftData
 
 struct BridgeListView: View {
+    @Binding var selectedBridgeID: UUID?
+
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Bridge.createdAt, order: .reverse) private var bridges: [Bridge]
+    @Query(sort: \SavedPlaylist.createdAt, order: .reverse) private var playlists: [SavedPlaylist]
+    @Query private var users: [User]
+    @Environment(PlaybackManager.self) private var playbackManager
     @State private var showNewBridge = false
     @State private var newBridgeName = ""
     @State private var newBridgePrivate = false
+    @State private var expandedPlaylists: Set<UUID> = []
+    @State private var navigationPath = NavigationPath()
+
+    private var currentUser: User? { users.first }
+    private var isUnderage: Bool { currentUser?.isUnderage ?? false }
 
     var body: some View {
+        NavigationStack(path: $navigationPath) {
         List {
-            ForEach(bridges) { bridge in
-                NavigationLink(destination: BridgeView(bridge: bridge)) {
-                    BridgeCard(bridge: bridge)
+            if bridges.isEmpty {
+                Section("Active Bridges") {
+                    Text("Tap + to create your first bridge.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                ForEach(bridges) { bridge in
+                    Section {
+                        NavigationLink(value: bridge) {
+                            BridgeCard(bridge: bridge)
+                        }
+                    } header: {
+                        if bridge == bridges.first {
+                            Text("Active Bridges")
+                        }
+                    }
+
+                    // Tracks in their own section so NavigationLink doesn't swallow taps
+                    if !bridge.trackList.isEmpty {
+                        Section {
+                            ForEach(bridge.trackList.prefix(5)) { track in
+                                trackPlayRow(track: track, bridge: bridge, queue: bridge.trackList)
+                            }
+
+                            if bridge.trackList.count > 5 {
+                                NavigationLink(value: bridge) {
+                                    Text("+ \(bridge.trackList.count - 5) more tracks")
+                                        .font(.caption)
+                                        .foregroundStyle(.orange)
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            .onDelete(perform: deleteBridges)
+
+            Section("Saved Playlists") {
+                if playlists.isEmpty {
+                    Text("Playlists you save from bridges will appear here.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(playlists) { playlist in
+                        DisclosureGroup(
+                            isExpanded: Binding(
+                                get: { expandedPlaylists.contains(playlist.id) },
+                                set: { isExpanded in
+                                    if isExpanded {
+                                        expandedPlaylists.insert(playlist.id)
+                                    } else {
+                                        expandedPlaylists.remove(playlist.id)
+                                    }
+                                }
+                            )
+                        ) {
+                            if playlist.trackList.isEmpty {
+                                Text("No tracks")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                ForEach(playlist.trackList) { track in
+                                    trackPlayRow(track: track, queue: playlist.trackList)
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "music.note.list")
+                                    .font(.title3)
+                                    .foregroundStyle(.orange)
+                                    .frame(width: 32)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(playlist.name)
+                                        .font(.subheadline)
+                                    Text("\(playlist.trackCount) tracks")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+
+                                if playlist.spotifyPlaylistID != nil {
+                                    Image(systemName: "dot.radiowaves.left.and.right")
+                                        .font(.caption2)
+                                        .foregroundStyle(.green)
+                                }
+                            }
+                        }
+                    }
+                    .onDelete(perform: deletePlaylists)
+                }
+            }
+        }
+        .navigationDestination(for: Bridge.self) { bridge in
+            BridgeView(bridge: bridge)
+        }
+        .onChange(of: selectedBridgeID) { _, newID in
+            if let newID, let bridge = bridges.first(where: { $0.id == newID }) {
+                navigationPath.append(bridge)
+                selectedBridgeID = nil
+            }
         }
         .navigationTitle("GrooveWire")
         .toolbar {
@@ -27,32 +134,30 @@ struct BridgeListView: View {
         }
         .alert("New Bridge", isPresented: $showNewBridge) {
             TextField("Bridge name", text: $newBridgeName)
-            Toggle("Private (host-only invites)", isOn: $newBridgePrivate)
+            if !isUnderage {
+                Toggle("Private (host-only invites)", isOn: $newBridgePrivate)
+            }
             Button("Create") { createBridge() }
             Button("Cancel", role: .cancel) {
                 newBridgeName = ""
                 newBridgePrivate = false
             }
         } message: {
-            Text("Give your bridge a name.")
-        }
-        .overlay {
-            if bridges.isEmpty {
-                ContentUnavailableView(
-                    "No Bridges",
-                    systemImage: "antenna.radiowaves.left.and.right",
-                    description: Text("Tap + to create your first bridge.")
-                )
+            if isUnderage {
+                Text("Give your bridge a name. Bridges are always private for users under 18.")
+            } else {
+                Text("Give your bridge a name.")
             }
         }
+        } // NavigationStack
     }
 
     private func createBridge() {
         let name = newBridgeName.trimmingCharacters(in: .whitespaces)
         let bridge = Bridge(
             name: name.isEmpty ? "My Bridge" : name,
-            hostID: UUID(),
-            isPublic: !newBridgePrivate
+            hostID: currentUser?.id ?? UUID(),
+            isPublic: isUnderage ? false : !newBridgePrivate
         )
         modelContext.insert(bridge)
         newBridgeName = ""
@@ -64,10 +169,97 @@ struct BridgeListView: View {
             modelContext.delete(bridges[index])
         }
     }
+
+    private func deletePlaylists(offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(playlists[index])
+        }
+    }
+
+    private func removeTrack(_ track: Track, from bridge: Bridge) {
+        bridge.trackList.removeAll { $0.id == track.id }
+        modelContext.delete(track)
+    }
+
+    // MARK: - Playable Track Row
+
+    private func trackPlayRow(track: Track, bridge: Bridge? = nil, queue: [Track] = []) -> some View {
+        HStack(spacing: 10) {
+            if let urlString = track.artworkURL, let url = URL(string: urlString) {
+                AsyncImage(url: url) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(.quaternary)
+                        .overlay {
+                            Image(systemName: "music.note")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                }
+                .frame(width: 32, height: 32)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+            } else {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(.quaternary)
+                    .frame(width: 32, height: 32)
+                    .overlay {
+                        Image(systemName: "music.note")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(track.title)
+                    .font(.caption)
+                    .lineLimit(1)
+                Text(track.artist)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            if bridge != nil {
+                Button { track.pin() } label: {
+                    Image(systemName: "arrow.up")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Move to top")
+
+                Button { track.bury() } label: {
+                    Image(systemName: "arrow.down")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Move to bottom")
+
+                Button { removeTrack(track, from: bridge!) } label: {
+                    Image(systemName: "xmark")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Remove track")
+            }
+
+            Button {
+                playbackManager.play(track: track, from: queue.isEmpty ? nil : queue)
+            } label: {
+                Image(systemName: "play.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            }
+            .buttonStyle(.plain)
+        }
+    }
 }
 
 #Preview {
-    NavigationStack {
-        BridgeListView()
-    }
+    BridgeListView(selectedBridgeID: .constant(nil))
 }

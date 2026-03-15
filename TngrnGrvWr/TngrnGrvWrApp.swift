@@ -12,6 +12,7 @@ import SwiftData
 struct TngrnGrvWrApp: App {
     @State private var spotifyService = SpotifyService()
     @State private var appleMusicService = AppleMusicService()
+    @State private var playbackManager: PlaybackManager?
     @State private var pendingBridgeID: UUID?
 
     var sharedModelContainer: ModelContainer = {
@@ -36,10 +37,19 @@ struct TngrnGrvWrApp: App {
             RootView()
                 .environment(spotifyService)
                 .environment(appleMusicService)
+                .environment(playbackManager ?? PlaybackManager(spotifyService: spotifyService, appleMusicService: appleMusicService))
+                .onAppear {
+                    if playbackManager == nil {
+                        playbackManager = PlaybackManager(spotifyService: spotifyService, appleMusicService: appleMusicService)
+                    }
+                }
                 .onOpenURL { url in
                     handleDeepLink(url)
                 }
         }
+        #if os(macOS)
+        .defaultSize(width: 700, height: 650)
+        #endif
         .modelContainer(sharedModelContainer)
     }
 

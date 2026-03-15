@@ -10,7 +10,20 @@ struct OnboardingView: View {
     @State private var avatarURL: String?
     @State private var showSpotifyLogin = false
     @State private var importedFromSpotify = false
+    @State private var birthday = Calendar.current.date(byAdding: .year, value: -18, to: Date()) ?? Date()
+    @State private var hasPickedBirthday = false
+    @State private var showParentalConsent = false
+    @State private var parentalConsent = false
     var onComplete: () -> Void
+
+    private var computedAge: AgeCategory {
+        User.computeAgeCategory(from: birthday)
+    }
+
+    private var hasContact: Bool {
+        !email.trimmingCharacters(in: .whitespaces).isEmpty ||
+        !phone.trimmingCharacters(in: .whitespaces).isEmpty
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -74,7 +87,22 @@ struct OnboardingView: View {
                     .autocapitalization(.words)
                     #endif
 
-                TextField("Email (optional)", text: $email)
+                DatePicker(
+                    "Birthday",
+                    selection: $birthday,
+                    in: Calendar.current.date(byAdding: .year, value: -120, to: Date())!...Date(),
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.automatic)
+                .onChange(of: birthday) { _, _ in
+                    hasPickedBirthday = true
+                }
+
+                if hasPickedBirthday {
+                    ageCategoryNotice
+                }
+
+                TextField("Email (required if no phone)", text: $email)
                     .textFieldStyle(.roundedBorder)
                     .textContentType(.emailAddress)
                     #if os(iOS)
@@ -82,7 +110,7 @@ struct OnboardingView: View {
                     .autocapitalization(.none)
                     #endif
 
-                TextField("Phone (optional)", text: $phone)
+                TextField("Phone (required if no email)", text: $phone)
                     .textFieldStyle(.roundedBorder)
                     .textContentType(.telephoneNumber)
                     #if os(iOS)
@@ -94,7 +122,11 @@ struct OnboardingView: View {
             Spacer()
 
             Button {
-                createUser()
+                if computedAge == .child || computedAge == .teen {
+                    showParentalConsent = true
+                } else {
+                    createUser()
+                }
             } label: {
                 Text("Get Started")
                     .font(.headline)
@@ -121,10 +153,49 @@ struct OnboardingView: View {
                 Task { await importSpotifyProfile() }
             }
         }
+        .alert("Parental Notice", isPresented: $showParentalConsent) {
+            Button("My parent/guardian approves") {
+                parentalConsent = true
+                createUser()
+            }
+            Button("Continue without consent") {
+                parentalConsent = false
+                createUser()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            if computedAge == .child {
+                Text("Users under 13 will always appear as \"Listener\" in bridges. A parent or guardian must approve use of this app.")
+            } else {
+                Text("Users 13-17 are private by default. With parental consent, your screen name can be shown in bridges.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var ageCategoryNotice: some View {
+        switch computedAge {
+        case .child:
+            Label("Under 13 — profile will be private, name hidden in bridges", systemImage: "lock.fill")
+                .font(.caption)
+                .foregroundStyle(.orange)
+        case .teen:
+            Label("13-17 — profile is private by default", systemImage: "lock.fill")
+                .font(.caption)
+                .foregroundStyle(.blue)
+        case .adult:
+            Label("18+ — you can choose public or private profile", systemImage: "checkmark.circle")
+                .font(.caption)
+                .foregroundStyle(.green)
+        case .unknown:
+            EmptyView()
+        }
     }
 
     private var canContinue: Bool {
-        !displayName.trimmingCharacters(in: .whitespaces).isEmpty
+        !displayName.trimmingCharacters(in: .whitespaces).isEmpty &&
+        hasPickedBirthday &&
+        hasContact
     }
 
     private func importSpotifyProfile() async {
@@ -154,11 +225,14 @@ struct OnboardingView: View {
             email: email.isEmpty ? nil : email.trimmingCharacters(in: .whitespaces),
             phoneNumber: phone.isEmpty ? nil : phone.trimmingCharacters(in: .whitespaces),
             streamingService: importedFromSpotify ? .spotify : .none,
-            avatarURL: avatarURL
+            avatarURL: avatarURL,
+            birthday: birthday,
+            hasCompletedAgeGate: true,
+            parentalConsentAcknowledged: parentalConsent
         )
         modelContext.insert(user)
         try? modelContext.save()
-        print("[Onboarding] User saved: \(user.displayName), email=\(user.email ?? "nil"), avatar=\(user.avatarURL != nil ? "yes" : "nil")")
+        print("[Onboarding] User saved: \(user.displayName), age=\(user.ageCategory), email=\(user.email ?? "nil")")
         onComplete()
     }
 }

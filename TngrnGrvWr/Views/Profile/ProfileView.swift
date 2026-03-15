@@ -81,6 +81,45 @@ struct ProfileView: View {
                 }
             }
 
+            if let user = currentUser {
+                Section("Privacy") {
+                    if let birthday = user.birthday {
+                        HStack {
+                            Label("Birthday", systemImage: "birthday.cake")
+                            Spacer()
+                            Text(birthday, style: .date)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    HStack {
+                        Label("Age Group", systemImage: "person.crop.circle.badge.clock")
+                        Spacer()
+                        Text(ageCategoryLabel(user.ageCategory))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if user.canChangePrivacy {
+                        Picker(selection: Binding(
+                            get: { user.privacyLevel },
+                            set: { user.privacyLevel = $0 }
+                        )) {
+                            Text("Public").tag("public")
+                            Text("Private").tag("private")
+                        } label: {
+                            Label("Profile Visibility", systemImage: "eye")
+                        }
+                    } else {
+                        HStack {
+                            Label("Profile Visibility", systemImage: "lock.fill")
+                            Spacer()
+                            Text("Private (age-restricted)")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
             Section("About") {
                 Label("Tangerine GrooveWire", systemImage: "antenna.radiowaves.left.and.right")
             }
@@ -101,6 +140,15 @@ struct ProfileView: View {
             if connected {
                 Task { await enrichFromSpotify() }
             }
+        }
+    }
+
+    private func ageCategoryLabel(_ category: AgeCategory) -> String {
+        switch category {
+        case .child: return "Under 13"
+        case .teen: return "13-17"
+        case .adult: return "18+"
+        case .unknown: return "Not set"
         }
     }
 

@@ -1,9 +1,13 @@
 import SwiftUI
+import SwiftData
 
 struct MembersSheet: View {
     let bridge: Bridge
     @Environment(\.dismiss) private var dismiss
+    @Query private var users: [User]
     @State private var expandedMember: String?
+
+    private var currentUser: User? { users.first }
 
     var body: some View {
         NavigationStack {
@@ -38,10 +42,21 @@ struct MembersSheet: View {
 
     // MARK: - Member Row
 
+    private func displayNameForMember(_ userID: String) -> String {
+        // Check if this member is the current user
+        if let current = currentUser, userID == current.id.uuidString {
+            return current.displayName
+        }
+        // For other users, respect age-based anonymity
+        // In a real networked app, we'd look up the remote user's profile
+        // For now, show truncated ID (will be replaced with CloudKit user lookup)
+        return String(userID.prefix(8)) + "..."
+    }
+
     @ViewBuilder
     private func memberRow(userID: String, role: BridgeRole) -> some View {
         let isExpanded = expandedMember == userID
-        let displayName = String(userID.prefix(8)) + "..."
+        let displayName = displayNameForMember(userID)
 
         VStack(spacing: 0) {
             // Main row — mini avatar + name + role badge
