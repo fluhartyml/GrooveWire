@@ -76,7 +76,7 @@ struct HomeView: View {
                             name: "Apple Music",
                             icon: "apple.logo",
                             connected: appleMusicService.isConnected,
-                            color: .pink
+                            color: .mint
                         )
 
                         if !spotifyService.isConnected && !appleMusicService.isConnected {
