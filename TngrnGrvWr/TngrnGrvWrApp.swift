@@ -13,6 +13,7 @@ struct TngrnGrvWrApp: App {
     @State private var spotifyService = SpotifyService()
     @State private var appleMusicService = AppleMusicService()
     @State private var playbackManager: PlaybackManager?
+    @State private var trackMatchingService: TrackMatchingService?
     @State private var pendingBridgeID: UUID?
 
     var sharedModelContainer: ModelContainer = {
@@ -38,9 +39,13 @@ struct TngrnGrvWrApp: App {
                 .environment(spotifyService)
                 .environment(appleMusicService)
                 .environment(playbackManager ?? PlaybackManager(spotifyService: spotifyService, appleMusicService: appleMusicService))
+                .environment(trackMatchingService ?? TrackMatchingService(spotifyService: spotifyService, appleMusicService: appleMusicService))
                 .onAppear {
                     if playbackManager == nil {
                         playbackManager = PlaybackManager(spotifyService: spotifyService, appleMusicService: appleMusicService)
+                    }
+                    if trackMatchingService == nil {
+                        trackMatchingService = TrackMatchingService(spotifyService: spotifyService, appleMusicService: appleMusicService)
                     }
                 }
                 .onOpenURL { url in

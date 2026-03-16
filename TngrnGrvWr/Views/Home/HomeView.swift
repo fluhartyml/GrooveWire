@@ -48,6 +48,17 @@ struct HomeView: View {
                     Text("GrooveWire")
                         .font(.title2.bold())
                         .foregroundStyle(.primary)
+
+                    HStack(spacing: 4) {
+                        Image("ClaudeLogo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 14, height: 14)
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                        Text("Engineered with Claude by Anthropic")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
                 .padding(.top, 12)
 

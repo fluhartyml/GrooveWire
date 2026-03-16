@@ -4,6 +4,7 @@ import SwiftData
 struct SearchView: View {
     @Environment(SpotifyService.self) private var spotifyService
     @Environment(AppleMusicService.self) private var appleMusicService
+    @Environment(TrackMatchingService.self) private var matchingService
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
@@ -28,6 +29,33 @@ struct SearchView: View {
                         .disabled(query.isEmpty || isSearching)
                 }
                 .padding()
+
+                // Service status bar
+                HStack(spacing: 16) {
+                    if spotifyService.isConnected {
+                        Label("Spotify", systemImage: "dot.radiowaves.left.and.right")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                    }
+                    if appleMusicService.isConnected {
+                        Label("Apple Music", systemImage: "apple.logo")
+                            .font(.caption2)
+                            .foregroundStyle(.pink)
+                    }
+                    if !spotifyService.isConnected && !appleMusicService.isConnected {
+                        Text("No services connected")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if spotifyService.isConnected && appleMusicService.isConnected {
+                        Text("Searching both services")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 8)
 
                 // Results
                 List {
@@ -76,32 +104,35 @@ struct SearchView: View {
     }
 
     private func performSearch() {
-        print("🔍 [SearchView] performSearch() CALLED — query: '\(query)'")
-        guard !query.isEmpty else {
-            print("🔍 [SearchView] query is empty, returning")
-            return
-        }
+        print("[SearchView] performSearch() — query: '\(query)'")
+        guard !query.isEmpty else { return }
         isSearching = true
         hasSearched = true
         error = nil
-        print("🔍 [SearchView] Spotify connected: \(spotifyService.isConnected), Apple Music connected: \(appleMusicService.isConnected)")
+
+        let bothConnected = spotifyService.isConnected && appleMusicService.isConnected
+        print("[SearchView] Spotify: \(spotifyService.isConnected), Apple Music: \(appleMusicService.isConnected)")
 
         Task {
             do {
-                if spotifyService.isConnected {
-                    print("🔍 [SearchView] Calling Spotify search...")
+                if bothConnected {
+                    // Both connected — search both and merge/deduplicate
+                    print("[SearchView] Dual-service search...")
+                    results = await matchingService.searchBothServices(query: query)
+                    print("[SearchView] Got \(results.count) merged results")
+                } else if spotifyService.isConnected {
+                    print("[SearchView] Spotify-only search...")
                     results = try await spotifyService.search(query: query)
-                    print("🔍 [SearchView] Got \(results.count) results from Spotify")
+                    print("[SearchView] Got \(results.count) results from Spotify")
                 } else if appleMusicService.isConnected {
-                    print("🔍 [SearchView] Calling Apple Music search...")
+                    print("[SearchView] Apple Music-only search...")
                     results = try await appleMusicService.search(query: query)
-                    print("🔍 [SearchView] Got \(results.count) results from Apple Music")
+                    print("[SearchView] Got \(results.count) results from Apple Music")
                 } else {
-                    print("🔍 [SearchView] No service connected!")
                     error = "Connect a streaming service in Profile to search."
                 }
             } catch {
-                print("🔍 [SearchView] ERROR: \(error)")
+                print("[SearchView] ERROR: \(error)")
                 self.error = error.localizedDescription
             }
             isSearching = false

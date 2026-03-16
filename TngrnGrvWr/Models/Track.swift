@@ -20,6 +20,9 @@ final class Track {
     var isPinned: Bool = false           // host forced to top of queue
     var isBuried: Bool = false           // host forced to bottom of queue
 
+    // Cross-service matching
+    var matchConfidenceRaw: String?      // MatchConfidence raw value
+
     var bridge: Bridge?
     var savedPlaylist: SavedPlaylist?
 
@@ -94,5 +97,26 @@ final class Track {
     func clearOverride() {
         isPinned = false
         isBuried = false
+    }
+
+    // MARK: - Cross-Service
+
+    /// Computed match confidence from stored raw value.
+    var matchConfidence: MatchConfidence? {
+        get { matchConfidenceRaw.flatMap { MatchConfidence(rawValue: $0) } }
+        set { matchConfidenceRaw = newValue?.rawValue }
+    }
+
+    /// True if this track is available on both Spotify and Apple Music.
+    var isOnBothServices: Bool {
+        spotifyID != nil && appleMusicID != nil
+    }
+
+    /// Which services this track is known to be available on.
+    var availableServices: [StreamingService] {
+        var services: [StreamingService] = []
+        if spotifyID != nil { services.append(.spotify) }
+        if appleMusicID != nil { services.append(.appleMusic) }
+        return services
     }
 }

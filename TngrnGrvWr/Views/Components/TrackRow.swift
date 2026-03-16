@@ -49,10 +49,15 @@ struct TrackRow: View {
                     .font(.body)
                     .lineLimit(1)
 
-                Text(track.artist)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(track.artist)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+
+                    // Service availability badges
+                    serviceBadges
+                }
             }
 
             Spacer()
@@ -66,6 +71,24 @@ struct TrackRow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
+        }
+    }
+
+    // MARK: - Service Badges
+
+    @ViewBuilder
+    private var serviceBadges: some View {
+        HStack(spacing: 2) {
+            if track.spotifyID != nil {
+                Image(systemName: "dot.radiowaves.left.and.right")
+                    .font(.system(size: 8))
+                    .foregroundStyle(.green)
+            }
+            if track.appleMusicID != nil {
+                Image(systemName: "apple.logo")
+                    .font(.system(size: 8))
+                    .foregroundStyle(.pink)
+            }
         }
     }
 

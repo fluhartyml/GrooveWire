@@ -354,7 +354,7 @@ final class SpotifyService: StreamingServiceProtocol {
             try await fetchDevices()
             guard selectedDeviceID != nil else {
                 print("[Spotify] No devices available — open Spotify on a device first")
-                throw SpotifyError.apiError(statusCode: 404)
+                throw SpotifyError.apiError(404)
             }
 
             // Retry with the newly selected device

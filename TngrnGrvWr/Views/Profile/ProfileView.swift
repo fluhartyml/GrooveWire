@@ -122,6 +122,17 @@ struct ProfileView: View {
 
             Section("About") {
                 Label("Tangerine GrooveWire", systemImage: "antenna.radiowaves.left.and.right")
+
+                HStack(spacing: 6) {
+                    Image("ClaudeLogo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 20, height: 20)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                    Text("Engineered with Claude by Anthropic")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .navigationTitle("Profile")
