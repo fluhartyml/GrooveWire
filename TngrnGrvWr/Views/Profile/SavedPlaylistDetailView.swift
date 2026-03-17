@@ -102,6 +102,13 @@ struct SavedPlaylistDetailView: View {
         for track in playlist.trackList {
             let duration = Int(track.durationSeconds)
             m3u += "#EXTINF:\(duration),\(track.artist) - \(track.title)\n"
+            if let appleMusicID = track.appleMusicID {
+                m3u += "https://music.apple.com/song/\(appleMusicID)\n"
+            } else if let spotifyID = track.spotifyID {
+                m3u += "https://open.spotify.com/track/\(spotifyID)\n"
+            } else {
+                m3u += "\(track.artist) - \(track.title).mp3\n"
+            }
         }
         let filename = playlist.name
             .replacingOccurrences(of: "/", with: "-")

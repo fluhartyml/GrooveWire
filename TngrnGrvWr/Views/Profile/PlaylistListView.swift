@@ -191,6 +191,13 @@ struct PlaylistListView: View {
         for track in playlist.trackList {
             let duration = Int(track.durationSeconds)
             m3u += "#EXTINF:\(duration),\(track.artist) - \(track.title)\n"
+            if let appleMusicID = track.appleMusicID {
+                m3u += "https://music.apple.com/song/\(appleMusicID)\n"
+            } else if let spotifyID = track.spotifyID {
+                m3u += "https://open.spotify.com/track/\(spotifyID)\n"
+            } else {
+                m3u += "\(track.artist) - \(track.title).mp3\n"
+            }
         }
         let filename = playlist.name
             .replacingOccurrences(of: "/", with: "-")
@@ -719,7 +726,8 @@ struct M3UExportSheet: View {
 
                 #if os(macOS)
                 Button {
-                    NSWorkspace.shared.open(m3uURL)
+                    let musicAppURL = URL(fileURLWithPath: "/System/Applications/Music.app")
+                    NSWorkspace.shared.open([m3uURL], withApplicationAt: musicAppURL, configuration: NSWorkspace.OpenConfiguration())
                     dismiss()
                 } label: {
                     Label("Open in Music", systemImage: "music.note")
@@ -738,19 +746,22 @@ struct M3UExportSheet: View {
                 }
                 .buttonStyle(.bordered)
 
-                Button {
-                    #if os(macOS)
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(m3uURL.path, forType: .string)
-                    #else
-                    UIPasteboard.general.url = m3uURL
-                    #endif
-                    dismiss()
-                } label: {
-                    Label("Copy File Path", systemImage: "doc.on.doc")
-                        .frame(maxWidth: .infinity)
+                if let spotifyID = playlist.spotifyPlaylistID {
+                    Button {
+                        let link = "https://open.spotify.com/playlist/\(spotifyID)"
+                        #if os(macOS)
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(link, forType: .string)
+                        #else
+                        UIPasteboard.general.string = link
+                        #endif
+                        dismiss()
+                    } label: {
+                        Label("Copy Spotify Link", systemImage: "doc.on.doc")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
 
                 Spacer()
             }
