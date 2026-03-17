@@ -10,7 +10,6 @@ struct PlaylistListView: View {
     @State private var selectedPlaylist: SavedPlaylist?
     @State private var showBridgePicker = false
     @State private var showAddPlaylist = false
-    @State private var showTransferSheet = false
     @State private var transferTarget: SavedPlaylist?
 
     // All tracks for the selected playlist, or all playlists combined
@@ -71,7 +70,6 @@ struct PlaylistListView: View {
 
                             Button {
                                 transferTarget = playlist
-                                showTransferSheet = true
                             } label: {
                                 Label("Transfer to Other Service", systemImage: "arrow.triangle.2.circlepath")
                             }
@@ -143,10 +141,8 @@ struct PlaylistListView: View {
         .sheet(isPresented: $showAddPlaylist) {
             AddPlaylistSheet(spotifyService: spotifyService) {}
         }
-        .sheet(isPresented: $showTransferSheet) {
-            if let transferTarget {
-                PlaylistTransferSheet(playlist: transferTarget)
-            }
+        .sheet(item: $transferTarget) { playlist in
+            PlaylistTransferSheet(playlist: playlist)
         }
         .sheet(isPresented: $showBridgePicker) {
             BridgePickerSheet(tracks: displayedTracks, bridges: bridges) { bridge in
@@ -214,11 +210,13 @@ enum AddPlaylistMode: String, CaseIterable {
     case link = "Paste Link"
     case songs = "Import Songs"
     case file = "Import File"
+    case appleMusic = "Apple Music"
 }
 
 struct AddPlaylistSheet: View {
     let spotifyService: SpotifyService
     let onAdded: () -> Void
+    @Environment(AppleMusicService.self) private var appleMusicService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @State private var mode: AddPlaylistMode = .link
@@ -234,6 +232,11 @@ struct AddPlaylistSheet: View {
     @State private var filePlaylistName = ""
     @State private var fileContents = ""
     @State private var showFilePicker = false
+
+    // Apple Music mode
+    @State private var appleMusicPlaylists: [AppleMusicPlaylist] = []
+    @State private var selectedAppleMusicPlaylist: AppleMusicPlaylist?
+    @State private var isLoadingAppleMusicPlaylists = false
 
     @State private var isLoading = false
     @State private var statusMessage = ""
@@ -301,6 +304,53 @@ struct AddPlaylistSheet: View {
                                 .font(.subheadline)
                         }
                     }
+
+                case .appleMusic:
+                    if !appleMusicService.isConnected {
+                        Section {
+                            Label("Apple Music is not connected", systemImage: "exclamationmark.triangle")
+                                .foregroundStyle(.orange)
+                        }
+                    } else if isLoadingAppleMusicPlaylists {
+                        Section {
+                            HStack(spacing: 12) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Loading playlists...")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    } else if appleMusicPlaylists.isEmpty {
+                        Section {
+                            Text("No playlists found in your Apple Music library.")
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Section("Select a Playlist") {
+                            ForEach(appleMusicPlaylists) { playlist in
+                                Button {
+                                    selectedAppleMusicPlaylist = playlist
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(playlist.name)
+                                                .font(.subheadline)
+                                                .foregroundStyle(.primary)
+                                            Text("\(playlist.trackCount) tracks")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        if selectedAppleMusicPlaylist?.id == playlist.id {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundStyle(.orange)
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
                 }
 
                 if !statusMessage.isEmpty {
@@ -339,6 +389,19 @@ struct AddPlaylistSheet: View {
                 }
             }
         }
+        .onChange(of: mode) { _, newMode in
+            if newMode == .appleMusic && appleMusicPlaylists.isEmpty && appleMusicService.isConnected {
+                isLoadingAppleMusicPlaylists = true
+                Task {
+                    do {
+                        appleMusicPlaylists = try await appleMusicService.fetchPlaylists()
+                    } catch {
+                        errorMessage = "Failed to load Apple Music playlists: \(error.localizedDescription)"
+                    }
+                    isLoadingAppleMusicPlaylists = false
+                }
+            }
+        }
         .frame(minWidth: 450, minHeight: 350)
         .fileImporter(isPresented: $showFilePicker, allowedContentTypes: [.commaSeparatedText, .plainText, .m3uPlaylist]) { result in
             switch result {
@@ -371,6 +434,8 @@ struct AddPlaylistSheet: View {
             return filePlaylistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 || fileContents.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 || isLoading
+        case .appleMusic:
+            return selectedAppleMusicPlaylist == nil || isLoading
         }
     }
 
@@ -382,6 +447,58 @@ struct AddPlaylistSheet: View {
             await createFromSongs(name: songsPlaylistName, rawText: songsText)
         case .file:
             await createFromSongs(name: filePlaylistName, rawText: fileContents)
+        case .appleMusic:
+            await importFromAppleMusic()
+        }
+    }
+
+    private func importFromAppleMusic() async {
+        guard let selected = selectedAppleMusicPlaylist else { return }
+
+        isLoading = true
+        errorMessage = nil
+        statusMessage = "Fetching tracks from \(selected.name)..."
+
+        do {
+            let tracks = try await appleMusicService.fetchPlaylistTracks(playlistID: selected.id)
+
+            guard !tracks.isEmpty else {
+                errorMessage = "No tracks found in this playlist."
+                isLoading = false
+                return
+            }
+
+            let savedPlaylist = SavedPlaylist(
+                name: selected.name,
+                appleMusicPlaylistID: selected.id,
+                playlistDescription: selected.description,
+                isPublic: false
+            )
+            modelContext.insert(savedPlaylist)
+
+            for track in tracks {
+                let localTrack = Track(
+                    title: track.title,
+                    artist: track.artist,
+                    albumTitle: track.albumTitle,
+                    artworkURL: track.artworkURL,
+                    appleMusicID: track.appleMusicID,
+                    durationSeconds: track.durationSeconds,
+                    addedBy: UUID()
+                )
+                localTrack.savedPlaylist = savedPlaylist
+                modelContext.insert(localTrack)
+                savedPlaylist.trackList.append(localTrack)
+            }
+
+            try modelContext.save()
+            print("[Library] Imported Apple Music playlist '\(selected.name)' with \(tracks.count) tracks")
+
+            onAdded()
+            dismiss()
+        } catch {
+            errorMessage = "Failed to import: \(error.localizedDescription)"
+            isLoading = false
         }
     }
 

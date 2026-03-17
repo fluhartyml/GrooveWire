@@ -128,6 +128,14 @@ struct PlaylistTransferSheet: View {
 
     // MARK: - Configure
 
+    private var canCreateOnAppleMusic: Bool {
+        #if os(iOS)
+        return true
+        #else
+        return false
+        #endif
+    }
+
     @ViewBuilder
     private var configureSection: some View {
         Section("Transfer To") {
@@ -135,7 +143,7 @@ struct PlaylistTransferSheet: View {
                 if spotifyService.isConnected && sourceService != .spotify {
                     Text("Spotify").tag(StreamingService.spotify)
                 }
-                if appleMusicService.isConnected && sourceService != .appleMusic {
+                if appleMusicService.isConnected && sourceService != .appleMusic && canCreateOnAppleMusic {
                     Text("Apple Music").tag(StreamingService.appleMusic)
                 }
             }
@@ -146,6 +154,14 @@ struct PlaylistTransferSheet: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
+
+            #if os(macOS)
+            if sourceService == .spotify && appleMusicService.isConnected {
+                Label("Transfer to Apple Music available on iPhone/iPad", systemImage: "iphone")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            #endif
         }
 
         Section {

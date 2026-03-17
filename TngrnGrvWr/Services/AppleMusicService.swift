@@ -58,6 +58,50 @@ final class AppleMusicService: StreamingServiceProtocol {
         }
     }
 
+    // MARK: - Library Playlists
+
+    func fetchPlaylists() async throws -> [AppleMusicPlaylist] {
+        let request = MusicLibraryRequest<MusicKit.Playlist>()
+        let response = try await request.response()
+
+        var playlists: [AppleMusicPlaylist] = []
+        for playlist in response.items {
+            let detailed = try await playlist.with([.tracks])
+            playlists.append(AppleMusicPlaylist(
+                id: playlist.id.rawValue,
+                name: playlist.name,
+                description: playlist.standardDescription,
+                trackCount: detailed.tracks?.count ?? 0,
+                artworkURL: playlist.artwork?.url(width: 300, height: 300)?.absoluteString
+            ))
+        }
+        return playlists
+    }
+
+    func fetchPlaylistTracks(playlistID: String) async throws -> [Track] {
+        var request = MusicLibraryRequest<MusicKit.Playlist>()
+        request.filter(matching: \.id, equalTo: MusicItemID(playlistID))
+        let response = try await request.response()
+
+        guard let playlist = response.items.first else { return [] }
+
+        // Load tracks relationship
+        let detailedPlaylist = try await playlist.with([.tracks])
+        guard let tracks = detailedPlaylist.tracks else { return [] }
+
+        return tracks.map { song in
+            Track(
+                title: song.title,
+                artist: song.artistName,
+                albumTitle: song.albumTitle,
+                artworkURL: song.artwork?.url(width: 300, height: 300)?.absoluteString,
+                appleMusicID: song.id.rawValue,
+                durationSeconds: song.duration ?? 0,
+                addedBy: UUID()
+            )
+        }
+    }
+
     // MARK: - Playlist Creation
 
     func createPlaylist(name: String, description: String? = nil, trackIDs: [String]) async throws -> String {
@@ -118,6 +162,16 @@ final class AppleMusicService: StreamingServiceProtocol {
     func currentPlaybackPosition() async -> Double? {
         player.playbackTime
     }
+}
+
+// MARK: - Playlist
+
+struct AppleMusicPlaylist: Identifiable {
+    let id: String
+    let name: String
+    let description: String?
+    let trackCount: Int
+    let artworkURL: String?
 }
 
 // MARK: - Errors
