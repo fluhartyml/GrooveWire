@@ -10,6 +10,8 @@ struct PlaylistListView: View {
     @State private var selectedPlaylist: SavedPlaylist?
     @State private var showBridgePicker = false
     @State private var showAddPlaylist = false
+    @State private var showTransferSheet = false
+    @State private var transferTarget: SavedPlaylist?
 
     // All tracks for the selected playlist, or all playlists combined
     private var displayedTracks: [Track] {
@@ -66,6 +68,15 @@ struct PlaylistListView: View {
 
                                 Divider()
                             }
+
+                            Button {
+                                transferTarget = playlist
+                                showTransferSheet = true
+                            } label: {
+                                Label("Transfer to Other Service", systemImage: "arrow.triangle.2.circlepath")
+                            }
+
+                            Divider()
 
                             Button(role: .destructive) {
                                 deletePlaylist(playlist)
@@ -131,6 +142,11 @@ struct PlaylistListView: View {
         }
         .sheet(isPresented: $showAddPlaylist) {
             AddPlaylistSheet(spotifyService: spotifyService) {}
+        }
+        .sheet(isPresented: $showTransferSheet) {
+            if let transferTarget {
+                PlaylistTransferSheet(playlist: transferTarget)
+            }
         }
         .sheet(isPresented: $showBridgePicker) {
             BridgePickerSheet(tracks: displayedTracks, bridges: bridges) { bridge in

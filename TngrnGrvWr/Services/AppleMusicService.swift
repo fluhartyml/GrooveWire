@@ -58,6 +58,39 @@ final class AppleMusicService: StreamingServiceProtocol {
         }
     }
 
+    // MARK: - Playlist Creation
+
+    func createPlaylist(name: String, description: String? = nil, trackIDs: [String]) async throws -> String {
+        #if os(iOS)
+        let library = MusicLibrary.shared
+
+        // Resolve each Apple Music ID into a Song object
+        var songs: [Song] = []
+        for trackID in trackIDs {
+            let request = MusicCatalogResourceRequest<Song>(matching: \.id, equalTo: MusicItemID(trackID))
+            let response = try await request.response()
+            if let song = response.items.first {
+                songs.append(song)
+            }
+        }
+
+        guard !songs.isEmpty else {
+            throw AppleMusicError.noTracksToAdd
+        }
+
+        let playlist = try await library.createPlaylist(
+            name: name,
+            description: description,
+            items: songs
+        )
+
+        print("[AppleMusic] Created playlist '\(name)' with \(songs.count) tracks")
+        return playlist.id.rawValue
+        #else
+        throw AppleMusicError.notAvailableOnMac
+        #endif
+    }
+
     // MARK: - Playback
 
     func play(track: Track) async throws {
@@ -91,10 +124,14 @@ final class AppleMusicService: StreamingServiceProtocol {
 
 enum AppleMusicError: LocalizedError {
     case notAuthorized
+    case noTracksToAdd
+    case notAvailableOnMac
 
     var errorDescription: String? {
         switch self {
         case .notAuthorized: "Apple Music access was not authorized."
+        case .noTracksToAdd: "No tracks could be resolved for the playlist."
+        case .notAvailableOnMac: "Apple Music playlist creation is only available on iOS."
         }
     }
 }

@@ -7,6 +7,7 @@ struct SavedPlaylistDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Bridge.createdAt, order: .reverse) private var bridges: [Bridge]
     @State private var showBridgePicker = false
+    @State private var showTransferSheet = false
 
     var body: some View {
         List {
@@ -48,6 +49,13 @@ struct SavedPlaylistDetailView: View {
                     Label("Load into Bridge", systemImage: "antenna.radiowaves.left.and.right")
                 }
                 .disabled(playlist.trackList.isEmpty)
+
+                Button {
+                    showTransferSheet = true
+                } label: {
+                    Label("Transfer to Other Service", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .disabled(playlist.trackList.isEmpty)
             }
 
             Section("Tracks") {
@@ -65,6 +73,9 @@ struct SavedPlaylistDetailView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .sheet(isPresented: $showTransferSheet) {
+            PlaylistTransferSheet(playlist: playlist)
+        }
         .sheet(isPresented: $showBridgePicker) {
             BridgePickerSheet(tracks: playlist.trackList, bridges: bridges) { bridge in
                 for track in playlist.trackList {
