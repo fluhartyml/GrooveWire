@@ -8,6 +8,7 @@ struct SavedPlaylistDetailView: View {
     @Query(sort: \Bridge.createdAt, order: .reverse) private var bridges: [Bridge]
     @State private var showBridgePicker = false
     @State private var showTransferSheet = false
+    @State private var showExportSheet = false
 
     var body: some View {
         List {
@@ -56,6 +57,13 @@ struct SavedPlaylistDetailView: View {
                     Label("Transfer to Other Service", systemImage: "arrow.triangle.2.circlepath")
                 }
                 .disabled(playlist.trackList.isEmpty)
+
+                Button {
+                    showExportSheet = true
+                } label: {
+                    Label("Export Playlist", systemImage: "square.and.arrow.up")
+                }
+                .disabled(playlist.trackList.isEmpty)
             }
 
             Section("Tracks") {
@@ -84,5 +92,22 @@ struct SavedPlaylistDetailView: View {
                 try? modelContext.save()
             }
         }
+        .sheet(isPresented: $showExportSheet) {
+            M3UExportSheet(playlist: playlist, m3uURL: m3uFileURL(for: playlist))
+        }
+    }
+
+    private func m3uFileURL(for playlist: SavedPlaylist) -> URL {
+        var m3u = "#EXTM3U\n"
+        for track in playlist.trackList {
+            let duration = Int(track.durationSeconds)
+            m3u += "#EXTINF:\(duration),\(track.artist) - \(track.title)\n"
+        }
+        let filename = playlist.name
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(filename).m3u")
+        try? m3u.write(to: url, atomically: true, encoding: .utf8)
+        return url
     }
 }

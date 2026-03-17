@@ -11,6 +11,7 @@ struct PlaylistListView: View {
     @State private var showBridgePicker = false
     @State private var showAddPlaylist = false
     @State private var transferTarget: SavedPlaylist?
+    @State private var exportPlaylist: SavedPlaylist?
 
     // All tracks for the selected playlist, or all playlists combined
     private var displayedTracks: [Track] {
@@ -57,21 +58,16 @@ struct PlaylistListView: View {
                             selectedPlaylist = playlist
                         }
                         .contextMenu {
-                            if let spotifyID = playlist.spotifyPlaylistID {
-                                ShareLink(
-                                    item: URL(string: "https://open.spotify.com/playlist/\(spotifyID)")!,
-                                    preview: SharePreview(playlist.name, image: Image(systemName: "music.note.list"))
-                                ) {
-                                    Label("Share Spotify Link", systemImage: "square.and.arrow.up")
-                                }
-
-                                Divider()
-                            }
-
                             Button {
                                 transferTarget = playlist
                             } label: {
                                 Label("Transfer to Other Service", systemImage: "arrow.triangle.2.circlepath")
+                            }
+
+                            Button {
+                                exportPlaylist = playlist
+                            } label: {
+                                Label("Export Playlist", systemImage: "square.and.arrow.up")
                             }
 
                             Divider()
@@ -144,6 +140,9 @@ struct PlaylistListView: View {
         .sheet(item: $transferTarget) { playlist in
             PlaylistTransferSheet(playlist: playlist)
         }
+        .sheet(item: $exportPlaylist) { playlist in
+            M3UExportSheet(playlist: playlist, m3uURL: m3uFileURL(for: playlist))
+        }
         .sheet(isPresented: $showBridgePicker) {
             BridgePickerSheet(tracks: displayedTracks, bridges: bridges) { bridge in
                 for track in displayedTracks {
@@ -186,6 +185,20 @@ struct PlaylistListView: View {
     }
 
     // MARK: - Actions
+
+    private func m3uFileURL(for playlist: SavedPlaylist) -> URL {
+        var m3u = "#EXTM3U\n"
+        for track in playlist.trackList {
+            let duration = Int(track.durationSeconds)
+            m3u += "#EXTINF:\(duration),\(track.artist) - \(track.title)\n"
+        }
+        let filename = playlist.name
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(filename).m3u")
+        try? m3u.write(to: url, atomically: true, encoding: .utf8)
+        return url
+    }
 
     private func deletePlaylist(_ playlist: SavedPlaylist) {
         // Also unfollow on Spotify if we have an ID
@@ -679,4 +692,76 @@ struct AddPlaylistSheet: View {
 
 extension UTType {
     static let m3uPlaylist = UTType(filenameExtension: "m3u") ?? .plainText
+}
+
+// MARK: - M3U Export Sheet
+
+struct M3UExportSheet: View {
+    let playlist: SavedPlaylist
+    let m3uURL: URL
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Image(systemName: "music.note.list")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.orange)
+
+                Text(playlist.name)
+                    .font(.headline)
+
+                Text("\(playlist.trackCount) tracks")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Divider()
+
+                #if os(macOS)
+                Button {
+                    NSWorkspace.shared.open(m3uURL)
+                    dismiss()
+                } label: {
+                    Label("Open in Music", systemImage: "music.note")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+                #endif
+
+                ShareLink(
+                    item: m3uURL,
+                    preview: SharePreview(playlist.name, image: Image(systemName: "music.note.list"))
+                ) {
+                    Label("Share via AirDrop / Messages", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+
+                Button {
+                    #if os(macOS)
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(m3uURL.path, forType: .string)
+                    #else
+                    UIPasteboard.general.url = m3uURL
+                    #endif
+                    dismiss()
+                } label: {
+                    Label("Copy File Path", systemImage: "doc.on.doc")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Export Playlist")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .frame(minWidth: 300, minHeight: 300)
+    }
 }
