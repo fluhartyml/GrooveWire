@@ -12,6 +12,8 @@ struct PlaylistListView: View {
     @State private var showAddPlaylist = false
     @State private var transferTarget: SavedPlaylist?
     @State private var exportPlaylist: SavedPlaylist?
+    @State private var isSyncing = false
+    @State private var syncMessage: String?
 
     // All tracks for the selected playlist, or all playlists combined
     private var displayedTracks: [Track] {
@@ -127,12 +129,37 @@ struct PlaylistListView: View {
         .navigationTitle("My Library")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showAddPlaylist = true
-                } label: {
-                    Image(systemName: "plus")
+                HStack(spacing: 12) {
+                    if spotifyService.isConnected {
+                        Button {
+                            Task { await syncFromSpotify() }
+                        } label: {
+                            if isSyncing {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                            }
+                        }
+                        .disabled(isSyncing)
+                        .help("Sync from Spotify")
+                    }
+
+                    Button {
+                        showAddPlaylist = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
                 }
             }
+        }
+        .alert("Spotify Sync", isPresented: Binding(
+            get: { syncMessage != nil },
+            set: { if !$0 { syncMessage = nil } }
+        )) {
+            Button("OK") { syncMessage = nil }
+        } message: {
+            Text(syncMessage ?? "")
         }
         .sheet(isPresented: $showAddPlaylist) {
             AddPlaylistSheet(spotifyService: spotifyService) {}
@@ -200,6 +227,62 @@ struct PlaylistListView: View {
         modelContext.delete(playlist)
         try? modelContext.save()
         print("[Library] Deleted playlist '\(playlist.name)' from local library")
+    }
+
+    private func syncFromSpotify() async {
+        isSyncing = true
+        defer { isSyncing = false }
+
+        do {
+            let remotePlaylists = try await spotifyService.fetchPlaylists()
+            let existingIDs = Set(savedPlaylists.compactMap { $0.spotifyPlaylistID })
+
+            var added = 0
+            for remote in remotePlaylists {
+                guard !existingIDs.contains(remote.id) else { continue }
+
+                // Fetch tracks for this playlist
+                let tracks = try await spotifyService.fetchPlaylistTracks(playlistID: remote.id)
+
+                let saved = SavedPlaylist(
+                    name: remote.name,
+                    spotifyPlaylistID: remote.id,
+                    playlistDescription: remote.description,
+                    isPublic: remote.isPublic,
+                    imageURL: remote.imageURL,
+                    ownerName: remote.ownerName
+                )
+                modelContext.insert(saved)
+
+                for track in tracks {
+                    let localTrack = Track(
+                        title: track.title,
+                        artist: track.artist,
+                        albumTitle: track.albumTitle,
+                        artworkURL: track.artworkURL,
+                        spotifyID: track.spotifyID,
+                        durationSeconds: track.durationSeconds,
+                        addedBy: UUID()
+                    )
+                    localTrack.savedPlaylist = saved
+                    modelContext.insert(localTrack)
+                    saved.trackList.append(localTrack)
+                }
+
+                added += 1
+                print("[Library] Synced '\(remote.name)' (\(tracks.count) tracks)")
+            }
+
+            try modelContext.save()
+
+            if added == 0 {
+                syncMessage = "All Spotify playlists are already in your library."
+            } else {
+                syncMessage = "Added \(added) new playlist\(added == 1 ? "" : "s") from Spotify."
+            }
+        } catch {
+            syncMessage = "Sync failed: \(error.localizedDescription)"
+        }
     }
 }
 
