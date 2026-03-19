@@ -93,28 +93,7 @@ struct SavedPlaylistDetailView: View {
             }
         }
         .sheet(isPresented: $showExportSheet) {
-            M3UExportSheet(playlist: playlist, m3uURL: m3uFileURL(for: playlist))
+            M3UExportSheet(playlist: playlist)
         }
-    }
-
-    private func m3uFileURL(for playlist: SavedPlaylist) -> URL {
-        var m3u = "#EXTM3U\n"
-        for track in playlist.trackList {
-            let duration = Int(track.durationSeconds)
-            m3u += "#EXTINF:\(duration),\(track.artist) - \(track.title)\n"
-            if let appleMusicID = track.appleMusicID {
-                m3u += "https://music.apple.com/song/\(appleMusicID)\n"
-            } else if let spotifyID = track.spotifyID {
-                m3u += "https://open.spotify.com/track/\(spotifyID)\n"
-            } else {
-                m3u += "\(track.artist) - \(track.title).mp3\n"
-            }
-        }
-        let filename = playlist.name
-            .replacingOccurrences(of: "/", with: "-")
-            .replacingOccurrences(of: ":", with: "-")
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(filename).m3u")
-        try? m3u.write(to: url, atomically: true, encoding: .utf8)
-        return url
     }
 }
