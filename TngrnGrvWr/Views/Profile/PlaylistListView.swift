@@ -238,11 +238,19 @@ struct PlaylistListView: View {
             let existingIDs = Set(savedPlaylists.compactMap { $0.spotifyPlaylistID })
 
             var added = 0
+            var skipped = 0
             for remote in remotePlaylists {
                 guard !existingIDs.contains(remote.id) else { continue }
 
-                // Fetch tracks for this playlist
-                let tracks = try await spotifyService.fetchPlaylistTracks(playlistID: remote.id)
+                // Fetch tracks — skip this playlist if we get a 403
+                let tracks: [Track]
+                do {
+                    tracks = try await spotifyService.fetchPlaylistTracks(playlistID: remote.id)
+                } catch SpotifyError.forbidden {
+                    print("[Library] Skipping '\(remote.name)' — 403 forbidden")
+                    skipped += 1
+                    continue
+                }
 
                 let saved = SavedPlaylist(
                     name: remote.name,
@@ -275,11 +283,16 @@ struct PlaylistListView: View {
 
             try modelContext.save()
 
-            if added == 0 {
-                syncMessage = "All Spotify playlists are already in your library."
+            var message = ""
+            if added > 0 {
+                message = "Added \(added) new playlist\(added == 1 ? "" : "s") from Spotify."
             } else {
-                syncMessage = "Added \(added) new playlist\(added == 1 ? "" : "s") from Spotify."
+                message = "All Spotify playlists are already in your library."
             }
+            if skipped > 0 {
+                message += " \(skipped) skipped (access denied)."
+            }
+            syncMessage = message
         } catch {
             syncMessage = "Sync failed: \(error.localizedDescription)"
         }

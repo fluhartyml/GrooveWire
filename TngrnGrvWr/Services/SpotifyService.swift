@@ -81,7 +81,8 @@ final class SpotifyService: StreamingServiceProtocol {
                 guard let id = item["id"] as? String,
                       let name = item["name"] as? String else { return nil }
                 let description = item["description"] as? String
-                let trackInfo = item["tracks"] as? [String: Any]
+                // Feb 2026 API: "tracks" renamed to "items", support both
+                let trackInfo = (item["items"] as? [String: Any]) ?? (item["tracks"] as? [String: Any])
                 let trackCount = trackInfo?["total"] as? Int ?? 0
                 let images = item["images"] as? [[String: Any]]
                 let imageURL = images?.first?["url"] as? String
@@ -162,7 +163,7 @@ final class SpotifyService: StreamingServiceProtocol {
         let uris = trackIDs.map { "spotify:track:\($0)" }
         for batch in stride(from: 0, to: uris.count, by: 100) {
             let slice = Array(uris[batch..<min(batch + 100, uris.count)])
-            let addURL = URL(string: "\(baseURL)/playlists/\(playlistID)/items")!
+            let addURL = URL(string: "\(baseURL)/playlists/\(playlistID)/items")!  // Feb 2026 API
             var addRequest = URLRequest(url: addURL)
             addRequest.httpMethod = "POST"
             addRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -201,7 +202,7 @@ final class SpotifyService: StreamingServiceProtocol {
     func fetchPlaylistTracks(playlistID: String) async throws -> [Track] {
         let token = try await authManager.validToken()
         var allTracks: [Track] = []
-        var nextURL: String? = "\(baseURL)/playlists/\(playlistID)/tracks?limit=100"
+        var nextURL: String? = "\(baseURL)/playlists/\(playlistID)/items?limit=100"
 
         while let urlString = nextURL {
             let url = URL(string: urlString)!
@@ -221,7 +222,9 @@ final class SpotifyService: StreamingServiceProtocol {
                   let items = json["items"] as? [[String: Any]] else { break }
 
             let tracks = items.compactMap { item -> Track? in
-                guard let trackData = item["track"] as? [String: Any],
+                // Feb 2026 API: "track" renamed to "item", support both
+                let trackData = (item["item"] as? [String: Any]) ?? (item["track"] as? [String: Any])
+                guard let trackData,
                       let id = trackData["id"] as? String,
                       let name = trackData["name"] as? String,
                       let durationMs = trackData["duration_ms"] as? Int,
