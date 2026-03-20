@@ -193,17 +193,11 @@ struct BridgeListView: View {
         }
         .onChange(of: selectedBridgeID) { _, newID in
             guard let newID else { return }
-            // Retry loop — bridge may not be in @Query yet after cross-tab creation
-            Task {
-                for _ in 0..<10 {
-                    if let bridge = bridges.first(where: { $0.id == newID }) {
-                        navigationPath.append(bridge)
-                        selectedBridgeID = nil
-                        return
-                    }
-                    try? await Task.sleep(for: .milliseconds(100))
-                }
-                selectedBridgeID = nil
+            navigateToBridge(id: newID)
+        }
+        .onAppear {
+            if let pendingID = selectedBridgeID {
+                navigateToBridge(id: pendingID)
             }
         }
         .navigationTitle("GrooveWire")
@@ -267,6 +261,30 @@ struct BridgeListView: View {
         modelContext.insert(bridge)
         newBridgeName = ""
         newBridgePrivate = false
+    }
+
+    private func navigateToBridge(id: UUID) {
+        // Try @Query first
+        if let bridge = bridges.first(where: { $0.id == id }) {
+            navigationPath.append(bridge)
+            selectedBridgeID = nil
+            return
+        }
+        // Fallback: fetch directly from model context
+        let descriptor = FetchDescriptor<Bridge>(predicate: #Predicate { $0.id == id })
+        if let bridge = try? modelContext.fetch(descriptor).first {
+            navigationPath.append(bridge)
+            selectedBridgeID = nil
+            return
+        }
+        // Last resort: retry after delay
+        Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            if let bridge = bridges.first(where: { $0.id == id }) {
+                navigationPath.append(bridge)
+            }
+            selectedBridgeID = nil
+        }
     }
 
     private func createBridgeFromPlaylist(_ playlist: SavedPlaylist) {
