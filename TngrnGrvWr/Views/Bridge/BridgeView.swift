@@ -16,12 +16,25 @@ struct BridgeView: View {
     @State private var showDeleteConfirm = false
     @State private var showMembers = false
     @State private var showAddPlaylist = false
+    @State private var selectedTrackID: UUID?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         List {
             nowPlayingSection
             queueSection
+        }
+        .background {
+            // Hidden Escape key handler to deselect/unpin
+            Button("") {
+                if let id = selectedTrackID,
+                   let track = bridge.trackList.first(where: { $0.id == id }) {
+                    track.clearOverride()
+                }
+                selectedTrackID = nil
+            }
+            .keyboardShortcut(.escape, modifiers: [])
+            .hidden()
         }
         .navigationTitle(bridge.name)
         .toolbar {
@@ -168,9 +181,25 @@ struct BridgeView: View {
                         onVoteUp: { track.vote(userID: bridge.hostID, isUpvote: true) },
                         onVoteDown: { track.vote(userID: bridge.hostID, isUpvote: false) }
                     )
-                    .onTapGesture {
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2) {
                         playbackManager.play(track: track, from: bridge.trackList)
+                        selectedTrackID = nil
                     }
+                    .onTapGesture(count: 1) {
+                        if selectedTrackID == track.id {
+                            // Deselect if tapping the same track
+                            track.clearOverride()
+                            selectedTrackID = nil
+                        } else {
+                            // Select and pin to play next
+                            track.pin()
+                            selectedTrackID = track.id
+                        }
+                    }
+                    .listRowBackground(
+                        selectedTrackID == track.id ? Color.orange.opacity(0.15) : nil
+                    )
                     .swipeActions(edge: .trailing) {
                         Button {
                             track.vote(userID: bridge.hostID, isUpvote: false)
