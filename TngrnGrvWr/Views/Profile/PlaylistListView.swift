@@ -14,6 +14,7 @@ struct PlaylistListView: View {
     @State private var showAddPlaylist = false
     @State private var transferTarget: SavedPlaylist?
     @State private var exportPlaylist: SavedPlaylist?
+    @State private var searchTargetPlaylist: SavedPlaylist?
     @State private var isSyncing = false
     @State private var syncMessage: String?
 
@@ -68,6 +69,20 @@ struct PlaylistListView: View {
                                 Label("Create Bridge from Playlist", systemImage: "antenna.radiowaves.left.and.right")
                             }
                             .disabled(playlist.trackList.isEmpty)
+
+                            Button {
+                                searchTargetPlaylist = playlist
+                            } label: {
+                                Label("Add Tracks", systemImage: "plus.circle")
+                            }
+
+                            Button {
+                                playlist.isPublic.toggle()
+                                try? modelContext.save()
+                            } label: {
+                                Label(playlist.isPublic ? "Make Private" : "Make Public",
+                                      systemImage: playlist.isPublic ? "lock.fill" : "globe")
+                            }
 
                             Button {
                                 transferTarget = playlist
@@ -172,6 +187,9 @@ struct PlaylistListView: View {
         }
         .sheet(isPresented: $showAddPlaylist) {
             AddPlaylistSheet(spotifyService: spotifyService) {}
+        }
+        .sheet(item: $searchTargetPlaylist) { playlist in
+            AddTracksToPlaylistSheet(playlist: playlist, spotifyService: spotifyService)
         }
         .sheet(item: $transferTarget) { playlist in
             PlaylistTransferSheet(playlist: playlist)
@@ -996,5 +1014,131 @@ struct M3UExportSheet: View {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(filename).m3u")
         try? m3u.write(to: url, atomically: true, encoding: .utf8)
         return url
+    }
+}
+
+// MARK: - Add Tracks to Playlist Sheet
+
+struct AddTracksToPlaylistSheet: View {
+    let playlist: SavedPlaylist
+    let spotifyService: SpotifyService
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @State private var searchQuery = ""
+    @State private var searchResults: [Track] = []
+    @State private var isSearching = false
+    @State private var addedCount = 0
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                HStack {
+                    TextField("Search songs...", text: $searchQuery)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit {
+                            Task { await search() }
+                        }
+                    Button {
+                        Task { await search() }
+                    } label: {
+                        if isSearching {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "magnifyingglass")
+                        }
+                    }
+                    .disabled(searchQuery.trimmingCharacters(in: .whitespaces).isEmpty || isSearching)
+                }
+                .padding()
+
+                if addedCount > 0 {
+                    Text("\(addedCount) track\(addedCount == 1 ? "" : "s") added to \(playlist.name)")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                        .padding(.horizontal)
+                }
+
+                if searchResults.isEmpty {
+                    Spacer()
+                    Text("Search for songs to add to \"\(playlist.name)\"")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                } else {
+                    List(searchResults) { track in
+                        HStack(spacing: 10) {
+                            if let urlString = track.artworkURL, let url = URL(string: urlString) {
+                                AsyncImage(url: url) { image in
+                                    image.resizable().aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    RoundedRectangle(cornerRadius: 4).fill(.quaternary)
+                                }
+                                .frame(width: 40, height: 40)
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                            }
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(track.title)
+                                    .font(.subheadline)
+                                    .lineLimit(1)
+                                Text(track.artist)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+
+                            Spacer()
+
+                            Button {
+                                addTrack(track)
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundStyle(.orange)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .navigationTitle("Add Tracks")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .frame(minWidth: 400, minHeight: 350)
+    }
+
+    private func search() async {
+        let query = searchQuery.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return }
+        isSearching = true
+        do {
+            searchResults = try await spotifyService.search(query: query)
+        } catch {
+            print("[AddTracks] Search failed: \(error.localizedDescription)")
+        }
+        isSearching = false
+    }
+
+    private func addTrack(_ track: Track) {
+        let newTrack = Track(
+            title: track.title,
+            artist: track.artist,
+            albumTitle: track.albumTitle,
+            artworkURL: track.artworkURL,
+            appleMusicID: track.appleMusicID,
+            spotifyID: track.spotifyID,
+            durationSeconds: track.durationSeconds,
+            addedBy: UUID()
+        )
+        newTrack.savedPlaylist = playlist
+        modelContext.insert(newTrack)
+        playlist.trackList.append(newTrack)
+        try? modelContext.save()
+        addedCount += 1
+        print("[Library] Added '\(track.title)' to playlist '\(playlist.name)'")
     }
 }
