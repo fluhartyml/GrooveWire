@@ -22,12 +22,12 @@ final class PlaybackManager {
 
     func play(track: Track, from trackList: [Track]? = nil) {
         if let trackList {
-            // Wrap queue: tapped track becomes index 0, everything before wraps to end
-            let tapIndex = trackList.firstIndex(where: { $0.id == track.id }) ?? 0
-            let after = Array(trackList[tapIndex...])
-            let before = Array(trackList[..<tapIndex])
-            queue = after + before
-            currentIndex = 0
+            if queue.isEmpty || queue.map({ $0.id }) != trackList.map({ $0.id }) {
+                // First time or different track list — load the queue
+                queue = trackList
+            }
+            // Jump to the tapped track within the existing queue
+            currentIndex = queue.firstIndex(where: { $0.id == track.id }) ?? 0
         }
         currentTrack = track
         isPlaying = true
@@ -157,8 +157,15 @@ final class PlaybackManager {
                 if canSkipForward {
                     print("[PlaybackManager] Track ended, advancing to next")
                     skipForward()
+                } else if !queue.isEmpty {
+                    // Wrap to beginning of queue
+                    print("[PlaybackManager] Queue wrapped to beginning")
+                    currentIndex = 0
+                    let nextTrack = queue[0]
+                    currentTrack = nextTrack
+                    Task { try? await activeService?.play(track: nextTrack) }
                 } else {
-                    // End of queue
+                    // No queue at all
                     print("[PlaybackManager] Queue finished")
                     isPlaying = false
                     stopPolling()

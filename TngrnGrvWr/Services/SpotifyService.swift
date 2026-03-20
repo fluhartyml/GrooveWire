@@ -410,6 +410,25 @@ final class SpotifyService: StreamingServiceProtocol {
         return Double(progressMs) / 1000.0
     }
 
+    // MARK: - Transfer Playback
+
+    func transferPlayback(to deviceID: String) async throws {
+        let token = try await authManager.validToken()
+        let url = URL(string: "\(baseURL)/me/player")!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = ["device_ids": [deviceID], "play": true]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        try checkResponse(response)
+        print("[SpotifyService] Transferred playback to device \(deviceID)")
+    }
+
     // MARK: - Helpers
 
     private func playerRequest(endpoint: String, method: String) async throws {

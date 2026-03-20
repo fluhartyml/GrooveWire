@@ -25,12 +25,8 @@ struct BridgeView: View {
             queueSection
         }
         .background {
-            // Hidden Escape key handler to deselect/unpin
+            // Hidden Escape key handler to deselect
             Button("") {
-                if let id = selectedTrackID,
-                   let track = bridge.trackList.first(where: { $0.id == id }) {
-                    track.clearOverride()
-                }
                 selectedTrackID = nil
             }
             .keyboardShortcut(.escape, modifiers: [])
@@ -162,13 +158,18 @@ struct BridgeView: View {
         }
     }
 
+    private var upcomingTracks: [Track] {
+        if playbackManager.queue.isEmpty {
+            return bridge.trackList
+        }
+        let afterCurrent = Array(playbackManager.queue.dropFirst(playbackManager.currentIndex + 1))
+        let beforeCurrent = Array(playbackManager.queue.prefix(playbackManager.currentIndex))
+        return afterCurrent + beforeCurrent
+    }
+
     @ViewBuilder
     private var queueSection: some View {
-        let upcoming: [Track] = if playbackManager.queue.isEmpty {
-            bridge.trackList
-        } else {
-            Array(playbackManager.queue.dropFirst(playbackManager.currentIndex + 1))
-        }
+        let upcoming = upcomingTracks
         Section(playbackManager.queue.isEmpty ? "Tracks (\(upcoming.count))" : "Up Next (\(upcoming.count))") {
             if upcoming.isEmpty {
                 Text("No tracks — tap + to add some")
@@ -187,15 +188,7 @@ struct BridgeView: View {
                         selectedTrackID = nil
                     }
                     .onTapGesture(count: 1) {
-                        if selectedTrackID == track.id {
-                            // Deselect if tapping the same track
-                            track.clearOverride()
-                            selectedTrackID = nil
-                        } else {
-                            // Select and pin to play next
-                            track.pin()
-                            selectedTrackID = track.id
-                        }
+                        selectedTrackID = selectedTrackID == track.id ? nil : track.id
                     }
                     .listRowBackground(
                         selectedTrackID == track.id ? Color.orange.opacity(0.15) : nil
@@ -227,29 +220,6 @@ struct BridgeView: View {
                             track.vote(userID: bridge.hostID, isUpvote: false)
                         } label: {
                             Label("Thumbs Down", systemImage: "hand.thumbsdown")
-                        }
-
-                        Divider()
-
-                        // Host/cohost override actions
-                        Button {
-                            track.pin()
-                        } label: {
-                            Label("Play Next", systemImage: "pin.fill")
-                        }
-
-                        Button {
-                            track.bury()
-                        } label: {
-                            Label("Play Last", systemImage: "arrow.down.to.line")
-                        }
-
-                        if track.isPinned || track.isBuried {
-                            Button {
-                                track.clearOverride()
-                            } label: {
-                                Label("Clear Override", systemImage: "xmark.circle")
-                            }
                         }
                     }
                 }

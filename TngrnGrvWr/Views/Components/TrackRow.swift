@@ -10,16 +10,6 @@ struct TrackRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Pin/bury indicator
-            if track.isPinned {
-                Image(systemName: "pin.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-            } else if track.isBuried {
-                Image(systemName: "arrow.down.to.line")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
 
             if let urlString = track.artworkURL, let url = URL(string: urlString) {
                 AsyncImage(url: url) { image in

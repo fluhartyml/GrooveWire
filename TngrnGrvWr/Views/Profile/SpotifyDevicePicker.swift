@@ -16,6 +16,7 @@ struct SpotifyDevicePicker: View {
                 ForEach(spotifyService.availableDevices) { device in
                     Button {
                         spotifyService.selectedDeviceID = device.id
+                        Task { try? await spotifyService.transferPlayback(to: device.id) }
                     } label: {
                         HStack {
                             Image(systemName: device.icon)

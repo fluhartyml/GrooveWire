@@ -92,8 +92,29 @@ struct MiniPlayerBar: View {
             }
             .buttonStyle(.plain)
             .popover(isPresented: $showDevicePicker) {
-                SpotifyDevicePicker()
-                    .frame(minWidth: 280, minHeight: 200)
+                VStack(spacing: 0) {
+                    List {
+                        SpotifyDevicePicker()
+                    }
+                    .listStyle(.plain)
+
+                    Divider()
+
+                    HStack {
+                        Button("Cancel") {
+                            showDevicePicker = false
+                        }
+                        Spacer()
+                        Button("Select") {
+                            showDevicePicker = false
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.green)
+                        .disabled(spotifyService.selectedDeviceID == nil)
+                    }
+                    .padding(12)
+                }
+                .frame(minWidth: 280, minHeight: 250)
             }
         }
     }
