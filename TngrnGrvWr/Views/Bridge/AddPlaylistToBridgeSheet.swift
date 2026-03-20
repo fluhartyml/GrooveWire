@@ -3,6 +3,7 @@ import SwiftData
 import UniformTypeIdentifiers
 
 enum AddToBridgeMode: String, CaseIterable {
+    case library = "My Library"
     case link = "Paste Link"
     case songs = "Import Songs"
     case file = "Import File"
@@ -14,7 +15,8 @@ struct AddPlaylistToBridgeSheet: View {
     @Environment(AppleMusicService.self) private var appleMusicService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @State private var mode: AddToBridgeMode = .link
+    @Query(sort: \SavedPlaylist.createdAt, order: .reverse) private var savedPlaylists: [SavedPlaylist]
+    @State private var mode: AddToBridgeMode = .library
 
     // Link mode
     @State private var linkText = ""
@@ -44,6 +46,37 @@ struct AddPlaylistToBridgeSheet: View {
                 .listRowBackground(Color.clear)
 
                 switch mode {
+                case .library:
+                    if savedPlaylists.isEmpty {
+                        Section {
+                            Text("No saved playlists yet. Sync from Spotify in My Library.")
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Section("Select a Playlist") {
+                            ForEach(savedPlaylists) { playlist in
+                                Button {
+                                    loadPlaylistIntoBridge(playlist)
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(playlist.name)
+                                                .font(.subheadline)
+                                                .foregroundStyle(.primary)
+                                            Text("\(playlist.trackCount) tracks")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "plus.circle.fill")
+                                            .foregroundStyle(.orange)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
                 case .link:
                     Section {
                         TextField("Spotify playlist link or URI", text: $linkText)
@@ -157,10 +190,39 @@ struct AddPlaylistToBridgeSheet: View {
         }
     }
 
+    // MARK: - Load from Library
+
+    private func loadPlaylistIntoBridge(_ playlist: SavedPlaylist) {
+        for track in playlist.trackList {
+            let newTrack = Track(
+                title: track.title,
+                artist: track.artist,
+                albumTitle: track.albumTitle,
+                artworkURL: track.artworkURL,
+                appleMusicID: track.appleMusicID,
+                spotifyID: track.spotifyID,
+                durationSeconds: track.durationSeconds,
+                addedBy: bridge.hostID
+            )
+            bridge.trackList.append(newTrack)
+            modelContext.insert(newTrack)
+        }
+        try? modelContext.save()
+        addedCount = playlist.trackCount
+        print("[Bridge] Loaded '\(playlist.name)' (\(playlist.trackCount) tracks) into '\(bridge.name)'")
+
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            dismiss()
+        }
+    }
+
     // MARK: - Validation
 
     private var isImportDisabled: Bool {
         switch mode {
+        case .library:
+            return true // library uses per-row buttons, not the Import button
         case .link:
             return linkText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading
         case .songs:
@@ -174,6 +236,8 @@ struct AddPlaylistToBridgeSheet: View {
 
     private func importTracks() async {
         switch mode {
+        case .library:
+            break // handled by per-row buttons
         case .link:
             await importFromLink()
         case .songs:
