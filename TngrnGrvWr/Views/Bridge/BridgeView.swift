@@ -17,6 +17,7 @@ struct BridgeView: View {
     @State private var showMembers = false
     @State private var showAddPlaylist = false
     @State private var selectedTrackID: UUID?
+    @State private var djMode = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -85,6 +86,8 @@ struct BridgeView: View {
                             get: { !bridge.isPublic },
                             set: { bridge.isPublic = !$0 }
                         ))
+
+                        Toggle("DJ Mode", isOn: $djMode)
 
                         Divider()
 
@@ -182,18 +185,32 @@ struct BridgeView: View {
 
     @ViewBuilder
     private var queueSection: some View {
-        let upcoming = upcomingTracks
-        Section(playbackManager.queue.isEmpty ? "Tracks (\(upcoming.count))" : "Up Next (\(upcoming.count))") {
-            if upcoming.isEmpty {
+        let trackCount = bridge.trackList.count
+        Section(queueBelongsToBridge ? "Up Next (\(trackCount))" : "Tracks (\(trackCount))") {
+            if bridge.trackList.isEmpty {
                 Text("No tracks — tap + to add some")
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(upcoming) { track in
+                ForEach(bridge.trackList) { track in
                     TrackRow(
                         track: track,
-                        currentUserID: bridge.hostID, // TODO: replace with actual current user ID
-                        onVoteUp: { track.vote(userID: bridge.hostID, isUpvote: true) },
-                        onVoteDown: { track.vote(userID: bridge.hostID, isUpvote: false) }
+                        currentUserID: bridge.hostID,
+                        onVoteUp: {
+                            track.vote(userID: bridge.hostID, isUpvote: true)
+                            if djMode {
+                                moveTrackToFront(track)
+                            } else if track.voteScore > 0 {
+                                moveTrack(track, direction: .up)
+                            }
+                        },
+                        onVoteDown: {
+                            track.vote(userID: bridge.hostID, isUpvote: false)
+                            if djMode {
+                                moveTrackToBack(track)
+                            } else if track.voteScore < 0 {
+                                moveTrack(track, direction: .down)
+                            }
+                        }
                     )
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) {
@@ -209,14 +226,42 @@ struct BridgeView: View {
                     .contextMenu {
                         Button {
                             track.vote(userID: bridge.hostID, isUpvote: true)
+                            if djMode {
+                                moveTrackToFront(track)
+                            } else if track.voteScore > 0 {
+                                moveTrack(track, direction: .up)
+                            }
                         } label: {
-                            Label("Thumbs Up", systemImage: "hand.thumbsup")
+                            Label(djMode ? "Play Next (DJ)" : "Thumbs Up", systemImage: "hand.thumbsup")
                         }
 
                         Button {
                             track.vote(userID: bridge.hostID, isUpvote: false)
+                            if djMode {
+                                moveTrackToBack(track)
+                            } else if track.voteScore < 0 {
+                                moveTrack(track, direction: .down)
+                            }
                         } label: {
-                            Label("Thumbs Down", systemImage: "hand.thumbsdown")
+                            Label(djMode ? "Play Last (DJ)" : "Thumbs Down", systemImage: "hand.thumbsdown")
+                        }
+
+                        Divider()
+
+                        if bridge.trackList.first?.id != track.id {
+                            Button {
+                                moveTrack(track, direction: .up)
+                            } label: {
+                                Label("Move Up", systemImage: "arrow.up")
+                            }
+                        }
+
+                        if bridge.trackList.last?.id != track.id {
+                            Button {
+                                moveTrack(track, direction: .down)
+                            } label: {
+                                Label("Move Down", systemImage: "arrow.down")
+                            }
                         }
 
                         Divider()
@@ -227,6 +272,17 @@ struct BridgeView: View {
                             Label("Remove from Queue", systemImage: "trash")
                         }
                     }
+                }
+                .onMove { from, to in
+                    bridge.trackList.move(fromOffsets: from, toOffset: to)
+                    // Sync playback queue if it belongs to this bridge
+                    if queueBelongsToBridge {
+                        playbackManager.queue = bridge.trackList
+                        if let current = playbackManager.currentTrack {
+                            playbackManager.currentIndex = bridge.trackList.firstIndex(where: { $0.id == current.id }) ?? 0
+                        }
+                    }
+                    try? modelContext.save()
                 }
             }
         }
@@ -260,6 +316,54 @@ struct BridgeView: View {
         }
         .buttonStyle(.plain)
         .listRowBackground(Color.clear)
+    }
+
+    // MARK: - Reorder
+
+    enum MoveDirection { case up, down }
+
+    private func moveTrack(_ track: Track, direction: MoveDirection) {
+        guard let index = bridge.trackList.firstIndex(where: { $0.id == track.id }) else { return }
+        let newIndex = direction == .up ? index - 1 : index + 1
+        guard newIndex >= 0 && newIndex < bridge.trackList.count else { return }
+
+        bridge.trackList.swapAt(index, newIndex)
+
+        if queueBelongsToBridge {
+            playbackManager.queue = bridge.trackList
+            if let current = playbackManager.currentTrack {
+                playbackManager.currentIndex = bridge.trackList.firstIndex(where: { $0.id == current.id }) ?? 0
+            }
+        }
+        try? modelContext.save()
+    }
+
+    // MARK: - DJ Queue Control
+
+    private func moveTrackToFront(_ track: Track) {
+        guard let index = bridge.trackList.firstIndex(where: { $0.id == track.id }),
+              index > 0 else { return }
+        let removed = bridge.trackList.remove(at: index)
+        bridge.trackList.insert(removed, at: 0)
+        syncQueueToBridge()
+    }
+
+    private func moveTrackToBack(_ track: Track) {
+        guard let index = bridge.trackList.firstIndex(where: { $0.id == track.id }),
+              index < bridge.trackList.count - 1 else { return }
+        let removed = bridge.trackList.remove(at: index)
+        bridge.trackList.append(removed)
+        syncQueueToBridge()
+    }
+
+    private func syncQueueToBridge() {
+        if queueBelongsToBridge {
+            playbackManager.queue = bridge.trackList
+            if let current = playbackManager.currentTrack {
+                playbackManager.currentIndex = bridge.trackList.firstIndex(where: { $0.id == current.id }) ?? 0
+            }
+        }
+        try? modelContext.save()
     }
 
     // MARK: - Remove Track
