@@ -144,6 +144,15 @@ struct PlaylistListView: View {
                 } else {
                     List(displayedTracks) { track in
                         TrackRow(track: track)
+                            .contextMenu {
+                                if let playlist = selectedPlaylist {
+                                    Button(role: .destructive) {
+                                        removeTrack(track, from: playlist)
+                                    } label: {
+                                        Label("Remove from Playlist", systemImage: "trash")
+                                    }
+                                }
+                            }
                     }
                     .listStyle(.plain)
                 }
@@ -239,6 +248,13 @@ struct PlaylistListView: View {
     }
 
     // MARK: - Actions
+
+    private func removeTrack(_ track: Track, from playlist: SavedPlaylist) {
+        playlist.trackList.removeAll { $0.id == track.id }
+        modelContext.delete(track)
+        try? modelContext.save()
+        print("[Library] Removed '\(track.title)' from playlist '\(playlist.name)'")
+    }
 
     private func createBridgeFromPlaylist(_ playlist: SavedPlaylist) {
         let bridge = Bridge(
@@ -1022,6 +1038,7 @@ struct M3UExportSheet: View {
 struct AddTracksToPlaylistSheet: View {
     let playlist: SavedPlaylist
     let spotifyService: SpotifyService
+    @Environment(AppleMusicService.self) private var appleMusicService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @State private var searchQuery = ""
@@ -1089,6 +1106,17 @@ struct AddTracksToPlaylistSheet: View {
 
                             Spacer()
 
+                            if track.spotifyID != nil {
+                                Image(systemName: "dot.radiowaves.left.and.right")
+                                    .font(.caption2)
+                                    .foregroundStyle(.green)
+                            }
+                            if track.appleMusicID != nil {
+                                Image(systemName: "apple.logo")
+                                    .font(.caption2)
+                                    .foregroundStyle(.pink)
+                            }
+
                             Button {
                                 addTrack(track)
                             } label: {
@@ -1115,11 +1143,37 @@ struct AddTracksToPlaylistSheet: View {
         let query = searchQuery.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return }
         isSearching = true
-        do {
-            searchResults = try await spotifyService.search(query: query)
-        } catch {
-            print("[AddTracks] Search failed: \(error.localizedDescription)")
+
+        var results: [Track] = []
+
+        // Search Spotify
+        if spotifyService.isConnected {
+            do {
+                let spotifyResults = try await spotifyService.search(query: query)
+                results.append(contentsOf: spotifyResults)
+            } catch {
+                print("[AddTracks] Spotify search failed: \(error.localizedDescription)")
+            }
         }
+
+        // Search Apple Music
+        if appleMusicService.isConnected {
+            do {
+                let appleResults = try await appleMusicService.search(query: query)
+                // Only add Apple Music results that aren't already in Spotify results (by title+artist)
+                let existingKeys = Set(results.map { "\($0.title.lowercased())|\($0.artist.lowercased())" })
+                for track in appleResults {
+                    let key = "\(track.title.lowercased())|\(track.artist.lowercased())"
+                    if !existingKeys.contains(key) {
+                        results.append(track)
+                    }
+                }
+            } catch {
+                print("[AddTracks] Apple Music search failed: \(error.localizedDescription)")
+            }
+        }
+
+        searchResults = results
         isSearching = false
     }
 
