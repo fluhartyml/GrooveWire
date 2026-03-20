@@ -14,6 +14,8 @@ struct BridgeListView: View {
     @State private var newBridgePrivate = false
     @State private var expandedPlaylists: Set<UUID> = []
     @State private var navigationPath = NavigationPath()
+    @State private var renameBridge: Bridge?
+    @State private var renameText = ""
 
     private var currentUser: User? { users.first }
     private var isUnderage: Bool { currentUser?.isUnderage ?? false }
@@ -32,6 +34,39 @@ struct BridgeListView: View {
                     Section {
                         NavigationLink(value: bridge) {
                             BridgeCard(bridge: bridge)
+                        }
+                        .contextMenu {
+                            Button {
+                                navigationPath.append(bridge)
+                            } label: {
+                                Label("Open Bridge", systemImage: "arrow.right.circle")
+                            }
+
+                            Button {
+                                renameBridge = bridge
+                                renameText = bridge.name
+                            } label: {
+                                Label("Rename", systemImage: "pencil")
+                            }
+
+                            Button {
+                                if bridge.isActive { bridge.stopBridge() }
+                                else { bridge.startBridge() }
+                            } label: {
+                                Label(
+                                    bridge.isActive ? "Stop Bridge" : "Start Bridge",
+                                    systemImage: bridge.isActive ? "stop.circle" : "play.circle"
+                                )
+                            }
+
+                            Divider()
+
+                            Button(role: .destructive) {
+                                modelContext.delete(bridge)
+                                try? modelContext.save()
+                            } label: {
+                                Label("Delete Bridge", systemImage: "trash")
+                            }
                         }
                     } header: {
                         if bridge == bridges.first {
@@ -170,6 +205,18 @@ struct BridgeListView: View {
             } else {
                 Text("Give your bridge a name.")
             }
+        }
+        .alert("Rename Bridge", isPresented: Binding(
+            get: { renameBridge != nil },
+            set: { if !$0 { renameBridge = nil } }
+        )) {
+            TextField("Bridge name", text: $renameText)
+            Button("Save") {
+                let name = renameText.trimmingCharacters(in: .whitespaces)
+                if !name.isEmpty { renameBridge?.name = name }
+                renameBridge = nil
+            }
+            Button("Cancel", role: .cancel) { renameBridge = nil }
         }
         } // NavigationStack
     }
