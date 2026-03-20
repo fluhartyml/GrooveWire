@@ -6,14 +6,9 @@ struct BridgeShareSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var users: [User]
     @State private var copied = false
-    @State private var inviteeBirthday = Calendar.current.date(byAdding: .year, value: -18, to: Date()) ?? Date()
-    @State private var hasPickedBirthday = false
+    @State private var inviteeAge: AgeCategory = .adult
 
     private var currentUser: User? { users.first }
-
-    private var inviteeAgeCategory: AgeCategory {
-        User.computeAgeCategory(from: inviteeBirthday)
-    }
 
     private var inviteLink: String {
         "tngrnGrvWr://bridge/\(bridge.id.uuidString)"
@@ -32,23 +27,16 @@ struct BridgeShareSheet: View {
                 BridgeTradingCard(bridge: bridge)
                     .padding()
 
-                // Invitee birthday collection
-                GroupBox("Invitee Info") {
+                GroupBox("Invitee Age") {
                     VStack(alignment: .leading, spacing: 8) {
-                        DatePicker(
-                            "Invitee's Birthday",
-                            selection: $inviteeBirthday,
-                            in: ...Date(),
-                            displayedComponents: .date
-                        )
-                        .datePickerStyle(.compact)
-                        .onChange(of: inviteeBirthday) { _, _ in
-                            hasPickedBirthday = true
+                        Picker("Age Group", selection: $inviteeAge) {
+                            Text("18+").tag(AgeCategory.adult)
+                            Text("13-17").tag(AgeCategory.teen)
+                            Text("Under 13").tag(AgeCategory.child)
                         }
+                        .pickerStyle(.segmented)
 
-                        if hasPickedBirthday {
-                            inviteeAgeNotice
-                        }
+                        ageNotice
                     }
                 }
                 .padding(.horizontal)
@@ -88,11 +76,10 @@ struct BridgeShareSheet: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(hasPickedBirthday ? .orange : .gray)
+                        .background(.orange)
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-                .disabled(!hasPickedBirthday)
                 .padding(.horizontal)
 
                 Spacer()
@@ -106,8 +93,8 @@ struct BridgeShareSheet: View {
     }
 
     @ViewBuilder
-    private var inviteeAgeNotice: some View {
-        switch inviteeAgeCategory {
+    private var ageNotice: some View {
+        switch inviteeAge {
         case .child:
             Label("Under 13 — they will be anonymous in the bridge", systemImage: "lock.fill")
                 .font(.caption)

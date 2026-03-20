@@ -21,6 +21,11 @@ struct BridgeView: View {
 
     var body: some View {
         List {
+            Section {
+                Text(bridge.name)
+                    .font(.title2.bold())
+                    .listRowBackground(Color.clear)
+            }
             nowPlayingSection
             queueSection
         }

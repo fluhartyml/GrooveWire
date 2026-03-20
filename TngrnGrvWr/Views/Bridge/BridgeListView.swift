@@ -16,6 +16,7 @@ struct BridgeListView: View {
     @State private var navigationPath = NavigationPath()
     @State private var renameBridge: Bridge?
     @State private var renameText = ""
+    @State private var shareBridge: Bridge?
 
     private var currentUser: User? { users.first }
     private var isUnderage: Bool { currentUser?.isUnderage ?? false }
@@ -40,6 +41,12 @@ struct BridgeListView: View {
                                 navigationPath.append(bridge)
                             } label: {
                                 Label("Open Bridge", systemImage: "arrow.right.circle")
+                            }
+
+                            Button {
+                                shareBridge = bridge
+                            } label: {
+                                Label("Invite", systemImage: "paperplane")
                             }
 
                             Button {
@@ -205,6 +212,9 @@ struct BridgeListView: View {
             } else {
                 Text("Give your bridge a name.")
             }
+        }
+        .sheet(item: $shareBridge) { bridge in
+            BridgeShareSheet(bridge: bridge)
         }
         .alert("Rename Bridge", isPresented: Binding(
             get: { renameBridge != nil },
