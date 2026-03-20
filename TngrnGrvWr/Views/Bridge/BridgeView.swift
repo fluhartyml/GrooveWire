@@ -59,8 +59,15 @@ struct BridgeView: View {
                         Divider()
 
                         Button {
-                            if bridge.isActive { bridge.stopBridge() }
-                            else { bridge.startBridge() }
+                            if bridge.isActive {
+                                bridge.stopBridge()
+                                playbackManager.pause()
+                            } else {
+                                bridge.startBridge()
+                                if let first = bridge.trackList.first {
+                                    playbackManager.play(track: first, from: bridge.trackList)
+                                }
+                            }
                         } label: {
                             Label(
                                 bridge.isActive ? "Stop Bridge" : "Start Bridge",
