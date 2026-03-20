@@ -163,13 +163,21 @@ struct BridgeView: View {
         }
     }
 
+    private var queueBelongsToBridge: Bool {
+        guard !playbackManager.queue.isEmpty else { return false }
+        // Check if the queue's tracks are from this bridge
+        let queueIDs = Set(playbackManager.queue.map { $0.id })
+        let bridgeIDs = Set(bridge.trackList.map { $0.id })
+        return !queueIDs.isDisjoint(with: bridgeIDs)
+    }
+
     private var upcomingTracks: [Track] {
-        if playbackManager.queue.isEmpty {
-            return bridge.trackList
+        if queueBelongsToBridge {
+            let afterCurrent = Array(playbackManager.queue.dropFirst(playbackManager.currentIndex + 1))
+            let beforeCurrent = Array(playbackManager.queue.prefix(playbackManager.currentIndex))
+            return afterCurrent + beforeCurrent
         }
-        let afterCurrent = Array(playbackManager.queue.dropFirst(playbackManager.currentIndex + 1))
-        let beforeCurrent = Array(playbackManager.queue.prefix(playbackManager.currentIndex))
-        return afterCurrent + beforeCurrent
+        return bridge.trackList
     }
 
     @ViewBuilder
@@ -198,22 +206,6 @@ struct BridgeView: View {
                     .listRowBackground(
                         selectedTrackID == track.id ? Color.orange.opacity(0.15) : nil
                     )
-                    .swipeActions(edge: .trailing) {
-                        Button {
-                            track.vote(userID: bridge.hostID, isUpvote: false)
-                        } label: {
-                            Label("Thumbs Down", systemImage: "hand.thumbsdown")
-                        }
-                        .tint(.red)
-                    }
-                    .swipeActions(edge: .leading) {
-                        Button {
-                            track.vote(userID: bridge.hostID, isUpvote: true)
-                        } label: {
-                            Label("Thumbs Up", systemImage: "hand.thumbsup")
-                        }
-                        .tint(.green)
-                    }
                     .contextMenu {
                         Button {
                             track.vote(userID: bridge.hostID, isUpvote: true)
@@ -225,6 +217,14 @@ struct BridgeView: View {
                             track.vote(userID: bridge.hostID, isUpvote: false)
                         } label: {
                             Label("Thumbs Down", systemImage: "hand.thumbsdown")
+                        }
+
+                        Divider()
+
+                        Button(role: .destructive) {
+                            removeTrack(track)
+                        } label: {
+                            Label("Remove from Queue", systemImage: "trash")
                         }
                     }
                 }
@@ -260,6 +260,15 @@ struct BridgeView: View {
         }
         .buttonStyle(.plain)
         .listRowBackground(Color.clear)
+    }
+
+    // MARK: - Remove Track
+
+    private func removeTrack(_ track: Track) {
+        bridge.trackList.removeAll { $0.id == track.id }
+        playbackManager.queue.removeAll { $0.id == track.id }
+        modelContext.delete(track)
+        try? modelContext.save()
     }
 
     // MARK: - Save as Playlist

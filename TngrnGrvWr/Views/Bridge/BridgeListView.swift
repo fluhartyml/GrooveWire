@@ -199,9 +199,17 @@ struct BridgeListView: View {
         .alert("New Bridge", isPresented: $showNewBridge) {
             TextField("Bridge name", text: $newBridgeName)
             if !isUnderage {
-                Toggle("Private (host-only invites)", isOn: $newBridgePrivate)
+                Button("Create Public") {
+                    newBridgePrivate = false
+                    createBridge()
+                }
+                Button("Create Private") {
+                    newBridgePrivate = true
+                    createBridge()
+                }
+            } else {
+                Button("Create") { createBridge() }
             }
-            Button("Create") { createBridge() }
             Button("Cancel", role: .cancel) {
                 newBridgeName = ""
                 newBridgePrivate = false
@@ -210,7 +218,7 @@ struct BridgeListView: View {
             if isUnderage {
                 Text("Give your bridge a name. Bridges are always private for users under 18.")
             } else {
-                Text("Give your bridge a name.")
+                Text("Give your bridge a name. Public bridges can be joined by anyone with the link.")
             }
         }
         .sheet(item: $shareBridge) { bridge in
