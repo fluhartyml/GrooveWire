@@ -22,8 +22,12 @@ final class PlaybackManager {
 
     func play(track: Track, from trackList: [Track]? = nil) {
         if let trackList {
-            queue = trackList
-            currentIndex = trackList.firstIndex(where: { $0.id == track.id }) ?? 0
+            // Wrap queue: tapped track becomes index 0, everything before wraps to end
+            let tapIndex = trackList.firstIndex(where: { $0.id == track.id }) ?? 0
+            let after = Array(trackList[tapIndex...])
+            let before = Array(trackList[..<tapIndex])
+            queue = after + before
+            currentIndex = 0
         }
         currentTrack = track
         isPlaying = true

@@ -256,7 +256,7 @@ struct PlaylistListView: View {
                     name: remote.name,
                     spotifyPlaylistID: remote.id,
                     playlistDescription: remote.description,
-                    isPublic: remote.isPublic,
+                    isPublic: false,
                     imageURL: remote.imageURL,
                     ownerName: remote.ownerName
                 )

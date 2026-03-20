@@ -151,7 +151,7 @@ struct BridgeView: View {
 
     @ViewBuilder
     private var queueSection: some View {
-        let upcoming = bridge.sortedUpcoming(after: playbackManager.currentIndex)
+        let upcoming = Array(playbackManager.queue.dropFirst(playbackManager.currentIndex + 1))
         Section("Up Next (\(upcoming.count))") {
             if upcoming.isEmpty {
                 Text("Queue is empty — tap + to add tracks")
