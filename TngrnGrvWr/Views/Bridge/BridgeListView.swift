@@ -192,8 +192,17 @@ struct BridgeListView: View {
             BridgeView(bridge: bridge)
         }
         .onChange(of: selectedBridgeID) { _, newID in
-            if let newID, let bridge = bridges.first(where: { $0.id == newID }) {
-                navigationPath.append(bridge)
+            guard let newID else { return }
+            // Retry loop — bridge may not be in @Query yet after cross-tab creation
+            Task {
+                for _ in 0..<10 {
+                    if let bridge = bridges.first(where: { $0.id == newID }) {
+                        navigationPath.append(bridge)
+                        selectedBridgeID = nil
+                        return
+                    }
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
                 selectedBridgeID = nil
             }
         }
