@@ -3,6 +3,7 @@ import SwiftData
 
 struct SavedPlaylistDetailView: View {
     let playlist: SavedPlaylist
+    var onBridgeCreated: ((UUID) -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Bridge.createdAt, order: .reverse) private var bridges: [Bridge]
@@ -45,9 +46,16 @@ struct SavedPlaylistDetailView: View {
 
             Section {
                 Button {
+                    createBridgeFromPlaylist()
+                } label: {
+                    Label("Create Bridge from Playlist", systemImage: "plus.circle")
+                }
+                .disabled(playlist.trackList.isEmpty)
+
+                Button {
                     showBridgePicker = true
                 } label: {
-                    Label("Load into Bridge", systemImage: "antenna.radiowaves.left.and.right")
+                    Label("Load into Existing Bridge", systemImage: "antenna.radiowaves.left.and.right")
                 }
                 .disabled(playlist.trackList.isEmpty)
 
@@ -95,5 +103,33 @@ struct SavedPlaylistDetailView: View {
         .sheet(isPresented: $showExportSheet) {
             M3UExportSheet(playlist: playlist)
         }
+    }
+
+    private func createBridgeFromPlaylist() {
+        let bridge = Bridge(
+            name: playlist.name,
+            hostID: UUID(),
+            isPublic: false
+        )
+        modelContext.insert(bridge)
+
+        for track in playlist.trackList {
+            let bridgeTrack = Track(
+                title: track.title,
+                artist: track.artist,
+                albumTitle: track.albumTitle,
+                artworkURL: track.artworkURL,
+                appleMusicID: track.appleMusicID,
+                spotifyID: track.spotifyID,
+                durationSeconds: track.durationSeconds,
+                addedBy: UUID()
+            )
+            modelContext.insert(bridgeTrack)
+            bridge.trackList.append(bridgeTrack)
+        }
+
+        try? modelContext.save()
+        print("[Library] Created bridge '\(playlist.name)' with \(playlist.trackCount) tracks")
+        onBridgeCreated?(bridge.id)
     }
 }

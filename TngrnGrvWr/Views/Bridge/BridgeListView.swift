@@ -17,6 +17,7 @@ struct BridgeListView: View {
     @State private var renameBridge: Bridge?
     @State private var renameText = ""
     @State private var shareBridge: Bridge?
+    @State private var newlyCreatedBridge: Bridge?
 
     private var currentUser: User? { users.first }
     private var isUnderage: Bool { currentUser?.isUnderage ?? false }
@@ -159,6 +160,14 @@ struct BridgeListView: View {
                                 .help("Play playlist")
                             }
                         }
+                        .contextMenu {
+                            Button {
+                                createBridgeFromPlaylist(playlist)
+                            } label: {
+                                Label("Create Bridge from Playlist", systemImage: "antenna.radiowaves.left.and.right")
+                            }
+                            .disabled(playlist.trackList.isEmpty)
+                        }
 
                         // Expanded tracks
                         if expandedPlaylists.contains(playlist.id) {
@@ -249,6 +258,34 @@ struct BridgeListView: View {
         modelContext.insert(bridge)
         newBridgeName = ""
         newBridgePrivate = false
+    }
+
+    private func createBridgeFromPlaylist(_ playlist: SavedPlaylist) {
+        let bridge = Bridge(
+            name: playlist.name,
+            hostID: currentUser?.id ?? UUID(),
+            isPublic: false
+        )
+        modelContext.insert(bridge)
+
+        for track in playlist.trackList {
+            let bridgeTrack = Track(
+                title: track.title,
+                artist: track.artist,
+                albumTitle: track.albumTitle,
+                artworkURL: track.artworkURL,
+                appleMusicID: track.appleMusicID,
+                spotifyID: track.spotifyID,
+                durationSeconds: track.durationSeconds,
+                addedBy: currentUser?.id ?? UUID()
+            )
+            modelContext.insert(bridgeTrack)
+            bridge.trackList.append(bridgeTrack)
+        }
+
+        try? modelContext.save()
+        print("[GrooveWire] Created bridge '\(playlist.name)' with \(playlist.trackCount) tracks from playlist")
+        navigationPath.append(bridge)
     }
 
     private func deleteBridges(offsets: IndexSet) {

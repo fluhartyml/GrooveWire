@@ -3,6 +3,8 @@ import SwiftData
 import MusicKit
 
 struct ProfileView: View {
+    var onBridgeCreated: ((UUID) -> Void)?
+
     @Environment(SpotifyService.self) private var spotifyService
     @Environment(AppleMusicService.self) private var appleMusicService
     @Environment(\.modelContext) private var modelContext
@@ -71,7 +73,7 @@ struct ProfileView: View {
 
             if spotifyService.isConnected {
                 Section {
-                    NavigationLink(destination: PlaylistListView()) {
+                    NavigationLink(destination: PlaylistListView(onBridgeCreated: onBridgeCreated)) {
                         Label("My Library", systemImage: "rectangle.split.1x2")
                     }
                 } header: {

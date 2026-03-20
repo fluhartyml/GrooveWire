@@ -24,7 +24,10 @@ struct MainTabView: View {
 
             Tab("Profile", systemImage: "person.fill", value: "profile") {
                 NavigationStack {
-                    ProfileView()
+                    ProfileView(onBridgeCreated: { bridgeID in
+                        selectedBridgeID = bridgeID
+                        selectedTab = "groovewire"
+                    })
                 }
             }
         }

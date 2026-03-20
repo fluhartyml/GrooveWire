@@ -3,6 +3,8 @@ import SwiftData
 import UniformTypeIdentifiers
 
 struct PlaylistListView: View {
+    var onBridgeCreated: ((UUID) -> Void)?
+
     @Environment(SpotifyService.self) private var spotifyService
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Bridge.createdAt, order: .reverse) private var bridges: [Bridge]
@@ -60,6 +62,13 @@ struct PlaylistListView: View {
                             selectedPlaylist = playlist
                         }
                         .contextMenu {
+                            Button {
+                                createBridgeFromPlaylist(playlist)
+                            } label: {
+                                Label("Create Bridge from Playlist", systemImage: "antenna.radiowaves.left.and.right")
+                            }
+                            .disabled(playlist.trackList.isEmpty)
+
                             Button {
                                 transferTarget = playlist
                             } label: {
@@ -212,6 +221,34 @@ struct PlaylistListView: View {
     }
 
     // MARK: - Actions
+
+    private func createBridgeFromPlaylist(_ playlist: SavedPlaylist) {
+        let bridge = Bridge(
+            name: playlist.name,
+            hostID: UUID(),
+            isPublic: false
+        )
+        modelContext.insert(bridge)
+
+        for track in playlist.trackList {
+            let bridgeTrack = Track(
+                title: track.title,
+                artist: track.artist,
+                albumTitle: track.albumTitle,
+                artworkURL: track.artworkURL,
+                appleMusicID: track.appleMusicID,
+                spotifyID: track.spotifyID,
+                durationSeconds: track.durationSeconds,
+                addedBy: UUID()
+            )
+            modelContext.insert(bridgeTrack)
+            bridge.trackList.append(bridgeTrack)
+        }
+
+        try? modelContext.save()
+        print("[Library] Created bridge '\(playlist.name)' with \(playlist.trackCount) tracks")
+        onBridgeCreated?(bridge.id)
+    }
 
     private func deletePlaylist(_ playlist: SavedPlaylist) {
         // Also unfollow on Spotify if we have an ID
