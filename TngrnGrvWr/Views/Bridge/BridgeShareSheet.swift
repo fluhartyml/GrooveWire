@@ -21,7 +21,7 @@ struct BridgeShareSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
-                Text("Share Bridge")
+                Text("Share GrooveWire Bridge")
                     .font(.headline)
 
                 BridgeTradingCard(bridge: bridge)
@@ -96,7 +96,7 @@ struct BridgeShareSheet: View {
     private var ageNotice: some View {
         switch inviteeAge {
         case .child:
-            Label("Under 13 — they will be anonymous in the bridge", systemImage: "lock.fill")
+            Label("Under 13 — they will be anonymous in the GrooveWire Bridge", systemImage: "lock.fill")
                 .font(.caption)
                 .foregroundStyle(.orange)
         case .teen:

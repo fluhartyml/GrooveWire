@@ -48,14 +48,14 @@ struct SavedPlaylistDetailView: View {
                 Button {
                     createBridgeFromPlaylist()
                 } label: {
-                    Label("Create Bridge from Playlist", systemImage: "plus.circle")
+                    Label("Create GrooveWire Bridge from Playlist", systemImage: "plus.circle")
                 }
                 .disabled(playlist.trackList.isEmpty)
 
                 Button {
                     showBridgePicker = true
                 } label: {
-                    Label("Load into Existing Bridge", systemImage: "antenna.radiowaves.left.and.right")
+                    Label("Load into Existing GrooveWire Bridge", systemImage: "antenna.radiowaves.left.and.right")
                 }
                 .disabled(playlist.trackList.isEmpty)
 

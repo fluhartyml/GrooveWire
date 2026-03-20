@@ -57,7 +57,7 @@ struct PlaylistDetailView: View {
                 Button {
                     showBridgePicker = true
                 } label: {
-                    Label("Load into Bridge", systemImage: "antenna.radiowaves.left.and.right")
+                    Label("Load into GrooveWire Bridge", systemImage: "antenna.radiowaves.left.and.right")
                 }
                 .disabled(tracks.isEmpty)
 
@@ -134,7 +134,7 @@ struct BridgePickerSheet: View {
         NavigationStack {
             List {
                 if bridges.isEmpty {
-                    Text("No bridges yet — create one first.")
+                    Text("No GrooveWire Bridges yet — create one first.")
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(bridges) { bridge in
@@ -159,7 +159,7 @@ struct BridgePickerSheet: View {
                     }
                 }
             }
-            .navigationTitle("Load into Bridge")
+            .navigationTitle("Load into GrooveWire Bridge")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

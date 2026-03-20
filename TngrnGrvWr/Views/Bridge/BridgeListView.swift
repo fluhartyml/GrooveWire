@@ -26,8 +26,8 @@ struct BridgeListView: View {
         NavigationStack(path: $navigationPath) {
         List {
             if bridges.isEmpty {
-                Section("Active Bridges") {
-                    Text("Tap + to create your first bridge.")
+                Section("Active GrooveWire Bridges") {
+                    Text("Tap + to create your first GrooveWire Bridge.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -41,7 +41,7 @@ struct BridgeListView: View {
                             Button {
                                 navigationPath.append(bridge)
                             } label: {
-                                Label("Open Bridge", systemImage: "arrow.right.circle")
+                                Label("Open GrooveWire Bridge", systemImage: "arrow.right.circle")
                             }
 
                             Button {
@@ -62,7 +62,7 @@ struct BridgeListView: View {
                                 else { bridge.startBridge() }
                             } label: {
                                 Label(
-                                    bridge.isActive ? "Stop Bridge" : "Start Bridge",
+                                    bridge.isActive ? "Stop GrooveWire Bridge" : "Start GrooveWire Bridge",
                                     systemImage: bridge.isActive ? "stop.circle" : "play.circle"
                                 )
                             }
@@ -73,12 +73,12 @@ struct BridgeListView: View {
                                 modelContext.delete(bridge)
                                 try? modelContext.save()
                             } label: {
-                                Label("Delete Bridge", systemImage: "trash")
+                                Label("Delete GrooveWire Bridge", systemImage: "trash")
                             }
                         }
                     } header: {
                         if bridge == bridges.first {
-                            Text("Active Bridges")
+                            Text("Active GrooveWire Bridges")
                         }
                     }
 
@@ -103,7 +103,7 @@ struct BridgeListView: View {
 
             Section("Saved Playlists") {
                 if playlists.isEmpty {
-                    Text("Playlists you save from bridges will appear here.")
+                    Text("Playlists you save from GrooveWire Bridges will appear here.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else {
@@ -164,7 +164,7 @@ struct BridgeListView: View {
                             Button {
                                 createBridgeFromPlaylist(playlist)
                             } label: {
-                                Label("Create Bridge from Playlist", systemImage: "antenna.radiowaves.left.and.right")
+                                Label("Create GrooveWire Bridge from Playlist", systemImage: "antenna.radiowaves.left.and.right")
                             }
                             .disabled(playlist.trackList.isEmpty)
                         }
@@ -204,12 +204,12 @@ struct BridgeListView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button { showNewBridge = true } label: {
-                    Label("New Bridge", systemImage: "plus")
+                    Label("New GrooveWire Bridge", systemImage: "plus")
                 }
             }
         }
-        .alert("New Bridge", isPresented: $showNewBridge) {
-            TextField("Bridge name", text: $newBridgeName)
+        .alert("New GrooveWire Bridge", isPresented: $showNewBridge) {
+            TextField("GrooveWire Bridge name", text: $newBridgeName)
             if !isUnderage {
                 Button("Create Public") {
                     newBridgePrivate = false
@@ -228,19 +228,19 @@ struct BridgeListView: View {
             }
         } message: {
             if isUnderage {
-                Text("Give your bridge a name. Bridges are always private for users under 18.")
+                Text("Give your GrooveWire Bridge a name. Bridges are always private for users under 18.")
             } else {
-                Text("Give your bridge a name. Public bridges can be joined by anyone with the link.")
+                Text("Give your GrooveWire Bridge a name. Public bridges can be joined by anyone with the link.")
             }
         }
         .sheet(item: $shareBridge) { bridge in
             BridgeShareSheet(bridge: bridge)
         }
-        .alert("Rename Bridge", isPresented: Binding(
+        .alert("Rename GrooveWire Bridge", isPresented: Binding(
             get: { renameBridge != nil },
             set: { if !$0 { renameBridge = nil } }
         )) {
-            TextField("Bridge name", text: $renameText)
+            TextField("GrooveWire Bridge name", text: $renameText)
             Button("Save") {
                 let name = renameText.trimmingCharacters(in: .whitespaces)
                 if !name.isEmpty { renameBridge?.name = name }
@@ -254,7 +254,7 @@ struct BridgeListView: View {
     private func createBridge() {
         let name = newBridgeName.trimmingCharacters(in: .whitespaces)
         let bridge = Bridge(
-            name: name.isEmpty ? "My Bridge" : name,
+            name: name.isEmpty ? "My GrooveWire Bridge" : name,
             hostID: currentUser?.id ?? UUID(),
             isPublic: isUnderage ? false : !newBridgePrivate
         )

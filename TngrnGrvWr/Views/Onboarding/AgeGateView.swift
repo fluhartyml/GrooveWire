@@ -124,9 +124,9 @@ struct AgeGateView: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             if computedAge == .child {
-                Text("Users under 13 will always appear as \"Listener\" in bridges. A parent or guardian must approve use of this app.")
+                Text("Users under 13 will always appear as \"Listener\" in GrooveWire Bridges. A parent or guardian must approve use of this app.")
             } else {
-                Text("Users 13-17 are private by default. With parental consent, your screen name can be shown in bridges.")
+                Text("Users 13-17 are private by default. With parental consent, your screen name can be shown in GrooveWire Bridges.")
             }
         }
     }
@@ -135,7 +135,7 @@ struct AgeGateView: View {
     private var ageCategoryNotice: some View {
         switch computedAge {
         case .child:
-            Label("Under 13 — profile will be private, name hidden in bridges", systemImage: "lock.fill")
+            Label("Under 13 — profile will be private, name hidden in GrooveWire Bridges", systemImage: "lock.fill")
                 .font(.caption)
                 .foregroundStyle(.orange)
         case .teen:

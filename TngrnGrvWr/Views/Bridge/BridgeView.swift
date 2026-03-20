@@ -64,14 +64,14 @@ struct BridgeView: View {
                                 playbackManager.play(track: first, from: bridge.trackList)
                             }
                         } label: {
-                            Label("Start Bridge", systemImage: "play.circle")
+                            Label("Start GrooveWire Bridge", systemImage: "play.circle")
                         }
 
                         Button {
                             bridge.stopBridge()
                             playbackManager.pause()
                         } label: {
-                            Label("Stop Bridge", systemImage: "stop.circle")
+                            Label("Stop GrooveWire Bridge", systemImage: "stop.circle")
                         }
 
                         if !bridge.trackList.isEmpty {
@@ -88,7 +88,7 @@ struct BridgeView: View {
                             Label("Add Playlist", systemImage: "text.badge.plus")
                         }
 
-                        Toggle("Private Bridge", isOn: Binding(
+                        Toggle("Private GrooveWire Bridge", isOn: Binding(
                             get: { !bridge.isPublic },
                             set: { bridge.isPublic = !$0 }
                         ))
@@ -109,7 +109,7 @@ struct BridgeView: View {
                         Button(role: .destructive) {
                             showDeleteConfirm = true
                         } label: {
-                            Label("Delete Bridge", systemImage: "trash")
+                            Label("Delete GrooveWire Bridge", systemImage: "trash")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -129,8 +129,8 @@ struct BridgeView: View {
         .sheet(isPresented: $showAddPlaylist) {
             AddPlaylistToBridgeSheet(bridge: bridge)
         }
-        .alert("Rename Bridge", isPresented: $showRename) {
-            TextField("Bridge name", text: $renameText)
+        .alert("Rename GrooveWire Bridge", isPresented: $showRename) {
+            TextField("GrooveWire Bridge name", text: $renameText)
             Button("Save") {
                 let name = renameText.trimmingCharacters(in: .whitespaces)
                 if !name.isEmpty { bridge.name = name }
@@ -145,7 +145,7 @@ struct BridgeView: View {
         } message: {
             Text(savePlaylistMessage ?? "")
         }
-        .alert("Delete Bridge?", isPresented: $showDeleteConfirm) {
+        .alert("Delete GrooveWire Bridge?", isPresented: $showDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 modelContext.delete(bridge)
                 try? modelContext.save()
@@ -413,7 +413,7 @@ struct BridgeView: View {
         let savedPlaylist = SavedPlaylist(
             name: playlistName,
             spotifyPlaylistID: spotifyPlaylistID,
-            playlistDescription: "Saved from bridge",
+            playlistDescription: "Saved from GrooveWire Bridge",
             isPublic: bridge.isPublic
         )
         modelContext.insert(savedPlaylist)

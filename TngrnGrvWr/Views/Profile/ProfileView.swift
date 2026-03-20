@@ -79,7 +79,7 @@ struct ProfileView: View {
                 } header: {
                     Text("Spotify Library")
                 } footer: {
-                    Text("Browse your playlists and songs. Load them into a listening bridge.")
+                    Text("Browse your playlists and songs. Load them into a GrooveWire Bridge.")
                 }
             }
 

@@ -91,7 +91,7 @@ struct HomeView: View {
                 // MARK: - Quick Stats
                 GroupBox("At a Glance") {
                     HStack {
-                        statCard(value: bridges.count, label: "Bridges", icon: "antenna.radiowaves.left.and.right")
+                        statCard(value: bridges.count, label: "GW Bridges", icon: "antenna.radiowaves.left.and.right")
                         Divider()
                         statCard(value: activeBridges.count, label: "Active", icon: "bolt.fill")
                         Divider()
@@ -160,7 +160,7 @@ struct HomeView: View {
 
                 // MARK: - Recent Bridges
                 if !bridges.isEmpty && activeBridges.isEmpty {
-                    GroupBox("Recent Bridges") {
+                    GroupBox("Recent GrooveWire Bridges") {
                         VStack(spacing: 8) {
                             ForEach(Array(bridges.prefix(3).enumerated()), id: \.element.id) { index, bridge in
                                 if index > 0 { Divider() }

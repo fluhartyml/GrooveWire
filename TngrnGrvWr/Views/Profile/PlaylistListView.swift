@@ -66,7 +66,7 @@ struct PlaylistListView: View {
                             Button {
                                 createBridgeFromPlaylist(playlist)
                             } label: {
-                                Label("Create Bridge from Playlist", systemImage: "antenna.radiowaves.left.and.right")
+                                Label("Create GrooveWire Bridge from Playlist", systemImage: "antenna.radiowaves.left.and.right")
                             }
                             .disabled(playlist.trackList.isEmpty)
 
@@ -125,7 +125,7 @@ struct PlaylistListView: View {
                         Button {
                             showBridgePicker = true
                         } label: {
-                            Label("Load into Bridge", systemImage: "antenna.radiowaves.left.and.right")
+                            Label("Load into GrooveWire Bridge", systemImage: "antenna.radiowaves.left.and.right")
                                 .font(.caption)
                         }
                         .padding(.trailing)
