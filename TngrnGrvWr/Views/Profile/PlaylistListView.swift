@@ -339,6 +339,7 @@ struct PlaylistListView: View {
 // MARK: - Add Playlist Sheet
 
 enum AddPlaylistMode: String, CaseIterable {
+    case create = "New"
     case link = "Paste Link"
     case songs = "Import Songs"
     case file = "Import File"
@@ -351,7 +352,10 @@ struct AddPlaylistSheet: View {
     @Environment(AppleMusicService.self) private var appleMusicService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @State private var mode: AddPlaylistMode = .link
+    @State private var mode: AddPlaylistMode = .create
+
+    // Create mode
+    @State private var newPlaylistName = ""
 
     // Link mode
     @State private var linkText = ""
@@ -386,6 +390,16 @@ struct AddPlaylistSheet: View {
                 .listRowBackground(Color.clear)
 
                 switch mode {
+                case .create:
+                    Section {
+                        TextField("Playlist name", text: $newPlaylistName)
+                            .textFieldStyle(.roundedBorder)
+                    } header: {
+                        Text("New Playlist")
+                    } footer: {
+                        Text("Create an empty playlist. Add tracks later from Search or other playlists.")
+                    }
+
                 case .link:
                     Section {
                         TextField("Spotify playlist link or URI", text: $linkText)
@@ -513,7 +527,7 @@ struct AddPlaylistSheet: View {
                         ProgressView()
                             .controlSize(.small)
                     } else {
-                        Button(mode == .link ? "Save" : "Import") {
+                        Button(mode == .create ? "Create" : mode == .link ? "Save" : "Import") {
                             Task { await save() }
                         }
                         .disabled(isSaveDisabled)
@@ -556,6 +570,8 @@ struct AddPlaylistSheet: View {
 
     private var isSaveDisabled: Bool {
         switch mode {
+        case .create:
+            return newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .link:
             return linkText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading
         case .songs:
@@ -573,6 +589,8 @@ struct AddPlaylistSheet: View {
 
     private func save() async {
         switch mode {
+        case .create:
+            createEmptyPlaylist()
         case .link:
             await saveFromLink()
         case .songs:
@@ -582,6 +600,19 @@ struct AddPlaylistSheet: View {
         case .appleMusic:
             await importFromAppleMusic()
         }
+    }
+
+    private func createEmptyPlaylist() {
+        let name = newPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let playlist = SavedPlaylist(
+            name: name,
+            isPublic: false
+        )
+        modelContext.insert(playlist)
+        try? modelContext.save()
+        print("[Library] Created empty playlist '\(name)'")
+        onAdded()
+        dismiss()
     }
 
     private func importFromAppleMusic() async {
