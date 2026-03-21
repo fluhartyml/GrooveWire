@@ -195,6 +195,18 @@ struct BridgeView: View {
         return bridge.trackList
     }
 
+    private var sortedTracks: [Track] {
+        let tracks = bridge.trackList
+        // Initialize sortOrder if all are 0 (legacy data)
+        if tracks.count > 1 && tracks.allSatisfy({ $0.sortOrder == 0 }) {
+            let byDate = tracks.sorted { $0.addedAt < $1.addedAt }
+            for (i, t) in byDate.enumerated() {
+                t.sortOrder = i
+            }
+        }
+        return tracks.sorted { $0.sortOrder < $1.sortOrder }
+    }
+
     @ViewBuilder
     private var queueSection: some View {
         let trackCount = bridge.trackList.count
@@ -203,7 +215,7 @@ struct BridgeView: View {
                 Text("No tracks — tap + to add some")
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(bridge.trackList) { track in
+                ForEach(sortedTracks) { track in
                     TrackRow(
                         track: track,
                         currentUserID: bridge.hostID,
@@ -260,21 +272,19 @@ struct BridgeView: View {
 
                         Divider()
 
-                        if bridge.trackList.first?.id != track.id {
-                            Button {
-                                moveTrack(track, direction: .up)
-                            } label: {
-                                Label("Move Up", systemImage: "arrow.up")
-                            }
+                        Button {
+                            moveTrack(track, direction: .up)
+                        } label: {
+                            Label("Move Up", systemImage: "arrow.up")
                         }
+                        .disabled(sortedTracks.first?.id == track.id)
 
-                        if bridge.trackList.last?.id != track.id {
-                            Button {
-                                moveTrack(track, direction: .down)
-                            } label: {
-                                Label("Move Down", systemImage: "arrow.down")
-                            }
+                        Button {
+                            moveTrack(track, direction: .down)
+                        } label: {
+                            Label("Move Down", systemImage: "arrow.down")
                         }
+                        .disabled(sortedTracks.last?.id == track.id)
 
                         Divider()
 
@@ -286,12 +296,15 @@ struct BridgeView: View {
                     }
                 }
                 .onMove { from, to in
-                    bridge.trackList.move(fromOffsets: from, toOffset: to)
-                    // Sync playback queue if it belongs to this bridge
+                    var tracks = sortedTracks
+                    tracks.move(fromOffsets: from, toOffset: to)
+                    for (i, t) in tracks.enumerated() {
+                        t.sortOrder = i
+                    }
                     if queueBelongsToBridge {
-                        playbackManager.queue = bridge.trackList
+                        playbackManager.queue = tracks
                         if let current = playbackManager.currentTrack {
-                            playbackManager.currentIndex = bridge.trackList.firstIndex(where: { $0.id == current.id }) ?? 0
+                            playbackManager.currentIndex = tracks.firstIndex(where: { $0.id == current.id }) ?? 0
                         }
                     }
                     try? modelContext.save()
@@ -337,18 +350,20 @@ struct BridgeView: View {
     enum MoveDirection { case up, down }
 
     private func moveTrack(_ track: Track, direction: MoveDirection) {
-        var tracks = bridge.trackList
-        guard let index = tracks.firstIndex(where: { $0.id == track.id }) else { return }
+        let sorted = sortedTracks
+        guard let index = sorted.firstIndex(where: { $0.id == track.id }) else { return }
         let newIndex = direction == .up ? index - 1 : index + 1
-        guard newIndex >= 0 && newIndex < tracks.count else { return }
+        guard newIndex >= 0 && newIndex < sorted.count else { return }
 
-        tracks.swapAt(index, newIndex)
-        bridge.trackList = tracks
+        let neighbor = sorted[newIndex]
+        let tempOrder = track.sortOrder
+        track.sortOrder = neighbor.sortOrder
+        neighbor.sortOrder = tempOrder
 
         if queueBelongsToBridge {
-            playbackManager.queue = bridge.trackList
+            playbackManager.queue = sortedTracks
             if let current = playbackManager.currentTrack {
-                playbackManager.currentIndex = bridge.trackList.firstIndex(where: { $0.id == current.id }) ?? 0
+                playbackManager.currentIndex = sortedTracks.firstIndex(where: { $0.id == current.id }) ?? 0
             }
         }
         try? modelContext.save()
@@ -358,26 +373,22 @@ struct BridgeView: View {
     // MARK: - DJ Queue Control
 
     private func moveTrackToFront(_ track: Track) {
-        guard let index = bridge.trackList.firstIndex(where: { $0.id == track.id }),
-              index > 0 else { return }
-        let removed = bridge.trackList.remove(at: index)
-        bridge.trackList.insert(removed, at: 0)
+        let minOrder = (sortedTracks.first?.sortOrder ?? 0) - 1
+        track.sortOrder = minOrder
         syncQueueToBridge()
     }
 
     private func moveTrackToBack(_ track: Track) {
-        guard let index = bridge.trackList.firstIndex(where: { $0.id == track.id }),
-              index < bridge.trackList.count - 1 else { return }
-        let removed = bridge.trackList.remove(at: index)
-        bridge.trackList.append(removed)
+        let maxOrder = (sortedTracks.last?.sortOrder ?? 0) + 1
+        track.sortOrder = maxOrder
         syncQueueToBridge()
     }
 
     private func syncQueueToBridge() {
         if queueBelongsToBridge {
-            playbackManager.queue = bridge.trackList
+            playbackManager.queue = sortedTracks
             if let current = playbackManager.currentTrack {
-                playbackManager.currentIndex = bridge.trackList.firstIndex(where: { $0.id == current.id }) ?? 0
+                playbackManager.currentIndex = sortedTracks.firstIndex(where: { $0.id == current.id }) ?? 0
             }
         }
         try? modelContext.save()

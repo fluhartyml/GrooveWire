@@ -13,6 +13,7 @@ final class Track {
     var durationSeconds: Double = 0
     var addedBy: UUID = UUID()
     var addedAt: Date = Date()
+    var sortOrder: Int = 0
 
     // Voting
     var voteScore: Int = 0
