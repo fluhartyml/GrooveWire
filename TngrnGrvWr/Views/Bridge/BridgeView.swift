@@ -60,6 +60,11 @@ struct BridgeView: View {
                         Divider()
 
                         Button {
+                            // Stop all other bridges first
+                            let allBridges = (try? modelContext.fetch(FetchDescriptor<Bridge>())) ?? []
+                            for other in allBridges where other.id != bridge.id {
+                                other.stopBridge()
+                            }
                             bridge.startBridge()
                             if let first = bridge.trackList.first {
                                 playbackManager.play(track: first, from: bridge.trackList)

@@ -58,8 +58,14 @@ struct BridgeListView: View {
                             }
 
                             Button {
-                                if bridge.isActive { bridge.stopBridge() }
-                                else { bridge.startBridge() }
+                                if bridge.isActive {
+                                    bridge.stopBridge()
+                                } else {
+                                    for other in bridges where other.id != bridge.id {
+                                        other.stopBridge()
+                                    }
+                                    bridge.startBridge()
+                                }
                             } label: {
                                 Label(
                                     bridge.isActive ? "Stop GrooveWire Bridge" : "Start GrooveWire Bridge",
