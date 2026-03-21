@@ -33,8 +33,8 @@ struct BridgeCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.orange.opacity(0.08))
-                .strokeBorder(Color.orange.opacity(0.3), lineWidth: 1)
+                .fill(Color.orange.opacity(0.2))
+                .strokeBorder(Color.orange.opacity(0.5), lineWidth: 1.5)
         )
     }
 }

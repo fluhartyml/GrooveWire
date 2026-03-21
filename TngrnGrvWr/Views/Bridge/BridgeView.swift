@@ -18,6 +18,7 @@ struct BridgeView: View {
     @State private var showAddPlaylist = false
     @State private var selectedTrackID: UUID?
     @State private var djMode = false
+    @State private var queueVersion = 0
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -289,9 +290,11 @@ struct BridgeView: View {
                         }
                     }
                     try? modelContext.save()
+                    queueVersion += 1
                 }
             }
         }
+        .id(queueVersion)
     }
 
     // MARK: - Playback
@@ -329,11 +332,13 @@ struct BridgeView: View {
     enum MoveDirection { case up, down }
 
     private func moveTrack(_ track: Track, direction: MoveDirection) {
-        guard let index = bridge.trackList.firstIndex(where: { $0.id == track.id }) else { return }
+        var tracks = bridge.trackList
+        guard let index = tracks.firstIndex(where: { $0.id == track.id }) else { return }
         let newIndex = direction == .up ? index - 1 : index + 1
-        guard newIndex >= 0 && newIndex < bridge.trackList.count else { return }
+        guard newIndex >= 0 && newIndex < tracks.count else { return }
 
-        bridge.trackList.swapAt(index, newIndex)
+        tracks.swapAt(index, newIndex)
+        bridge.trackList = tracks
 
         if queueBelongsToBridge {
             playbackManager.queue = bridge.trackList
@@ -342,6 +347,7 @@ struct BridgeView: View {
             }
         }
         try? modelContext.save()
+        queueVersion += 1
     }
 
     // MARK: - DJ Queue Control
@@ -370,6 +376,7 @@ struct BridgeView: View {
             }
         }
         try? modelContext.save()
+        queueVersion += 1
     }
 
     // MARK: - Remove Track
