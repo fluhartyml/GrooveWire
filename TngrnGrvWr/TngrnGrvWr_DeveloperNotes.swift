@@ -136,6 +136,17 @@
 //  Feedback and suggestions welcome!
 
 // ============================================================================
+// MARK: - PLANNED FEATURES
+// ============================================================================
+//
+//  - "For You" / Genius-style recommendations: Apple Music's Create Station
+//    and autoplay features can generate infinite playlists from a seed song.
+//    Add to GrooveWire bridges as a "Radio Mode" — host picks a seed track,
+//    Apple Music generates the queue automatically. Explore MusicKit
+//    Station/Recommendation APIs for personalized suggestions within bridges.
+//    (Noted 2026 MAR 22)
+
+// ============================================================================
 // MARK: - KNOWN ISSUES
 // ============================================================================
 //

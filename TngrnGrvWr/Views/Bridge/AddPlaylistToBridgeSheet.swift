@@ -15,6 +15,7 @@ struct AddPlaylistToBridgeSheet: View {
     @Environment(AppleMusicService.self) private var appleMusicService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.themeColor) private var themeColor
     @Query(sort: \SavedPlaylist.createdAt, order: .reverse) private var savedPlaylists: [SavedPlaylist]
     @State private var mode: AddToBridgeMode = .library
 
@@ -69,7 +70,7 @@ struct AddPlaylistToBridgeSheet: View {
                                         }
                                         Spacer()
                                         Image(systemName: "plus.circle.fill")
-                                            .foregroundStyle(.orange)
+                                            .foregroundStyle(themeColor)
                                     }
                                 }
                                 .buttonStyle(.plain)

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BridgeTradingCard: View {
     let bridge: Bridge
+    @Environment(\.themeColor) private var themeColor
 
     var body: some View {
         VStack(spacing: 0) {
@@ -9,7 +10,7 @@ struct BridgeTradingCard: View {
             VStack(spacing: 8) {
                 Image(systemName: "antenna.radiowaves.left.and.right")
                     .font(.title)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(themeColor)
 
                 Text(bridge.name)
                     .font(.title2.bold())
@@ -64,7 +65,7 @@ struct BridgeTradingCard: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(.orange.opacity(0.4), lineWidth: 2)
+                .strokeBorder(themeColor.opacity(0.4), lineWidth: 2)
         )
         .clipShape(RoundedRectangle(cornerRadius: 20))
     }

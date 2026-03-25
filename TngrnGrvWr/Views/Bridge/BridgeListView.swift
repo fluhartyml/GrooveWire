@@ -18,6 +18,7 @@ struct BridgeListView: View {
     @State private var renameText = ""
     @State private var shareBridge: Bridge?
     @State private var newlyCreatedBridge: Bridge?
+    @Environment(\.themeColor) private var themeColor
 
     private var currentUser: User? { users.first }
     private var isUnderage: Bool { currentUser?.isUnderage ?? false }
@@ -99,7 +100,7 @@ struct BridgeListView: View {
                                 NavigationLink(value: bridge) {
                                     Text("+ \(bridge.trackList.count - 5) more tracks")
                                         .font(.caption)
-                                        .foregroundStyle(.orange)
+                                        .foregroundStyle(themeColor)
                                 }
                             }
                         }
@@ -132,7 +133,7 @@ struct BridgeListView: View {
 
                             Image(systemName: "music.note.list")
                                 .font(.title3)
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(themeColor)
                                 .frame(width: 32)
 
                             VStack(alignment: .leading, spacing: 2) {
@@ -160,7 +161,7 @@ struct BridgeListView: View {
                                 } label: {
                                     Image(systemName: "play.fill")
                                         .font(.caption)
-                                        .foregroundStyle(.orange)
+                                        .foregroundStyle(themeColor)
                                 }
                                 .buttonStyle(.plain)
                                 .help("Play playlist")
@@ -410,7 +411,7 @@ struct BridgeListView: View {
             } label: {
                 Image(systemName: "play.fill")
                     .font(.caption2)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(themeColor)
             }
             .buttonStyle(.plain)
         }

@@ -6,6 +6,7 @@ struct PlaylistDetailView: View {
 
     @Environment(SpotifyService.self) private var spotifyService
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.themeColor) private var themeColor
     @Query(sort: \Bridge.createdAt, order: .reverse) private var bridges: [Bridge]
     @State private var tracks: [Track] = []
     @State private var isLoading = false
@@ -129,6 +130,7 @@ struct BridgePickerSheet: View {
     let bridges: [Bridge]
     let onSelect: (Bridge) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.themeColor) private var themeColor
 
     var body: some View {
         NavigationStack {
@@ -153,7 +155,7 @@ struct BridgePickerSheet: View {
                                 Spacer()
                                 Text("+\(tracks.count)")
                                     .font(.caption.bold())
-                                    .foregroundStyle(.orange)
+                                    .foregroundStyle(themeColor)
                             }
                         }
                     }

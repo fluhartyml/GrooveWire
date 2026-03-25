@@ -9,6 +9,7 @@ struct ProfileView: View {
     @Environment(AppleMusicService.self) private var appleMusicService
     @Environment(\.modelContext) private var modelContext
     @Query private var users: [User]
+    @Environment(ThemeManager.self) private var themeManager
     @State private var showSpotifyLogin = false
 
     private var currentUser: User? { users.first }
@@ -118,6 +119,16 @@ struct ProfileView: View {
                             Text("Private (age-restricted)")
                                 .foregroundStyle(.secondary)
                         }
+                    }
+                }
+            }
+
+            Section("Appearance") {
+                @Bindable var tm = themeManager
+                Picker("Theme", selection: $tm.currentTheme) {
+                    ForEach(AppTheme.allCases) { theme in
+                        Label(theme.displayName, systemImage: theme.icon)
+                            .tag(theme)
                     }
                 }
             }

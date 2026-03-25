@@ -22,6 +22,7 @@ struct PlaylistTransferSheet: View {
     @Environment(TrackMatchingService.self) private var trackMatchingService
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.themeColor) private var themeColor
 
     @State private var phase: TransferPhase = .configure
     @State private var targetService: StreamingService = .spotify
@@ -86,7 +87,7 @@ struct PlaylistTransferSheet: View {
             HStack(spacing: 14) {
                 Image(systemName: "music.note.list")
                     .font(.title2)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(themeColor)
                     .frame(width: 44, height: 44)
                     .background(.quaternary)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -152,7 +153,7 @@ struct PlaylistTransferSheet: View {
             if !canMatch {
                 Label("Connect \(targetService.displayName) to transfer", systemImage: "exclamationmark.triangle")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(themeColor)
             }
 
             #if os(macOS)
@@ -181,7 +182,7 @@ struct PlaylistTransferSheet: View {
         Section("Matching Tracks") {
             VStack(alignment: .leading, spacing: 8) {
                 ProgressView(value: trackMatchingService.matchProgress)
-                    .tint(.orange)
+                    .tint(themeColor)
 
                 let matched = Int(trackMatchingService.matchProgress * Double(playlist.trackCount))
                 Text("Matching track \(matched) of \(playlist.trackCount)...")
@@ -324,7 +325,7 @@ struct PlaylistTransferSheet: View {
                 if result.confidence == .near, let matched = result.matchedTrack {
                     Text("→ \(matched.title) — \(matched.artist)")
                         .font(.caption2)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(themeColor)
                         .lineLimit(1)
                 }
             }

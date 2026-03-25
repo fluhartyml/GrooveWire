@@ -8,6 +8,8 @@ struct HomeView: View {
     @Environment(AppleMusicService.self) private var appleMusicService
     @Query(sort: \Bridge.createdAt, order: .reverse) private var bridges: [Bridge]
     @Query(sort: \SavedPlaylist.createdAt, order: .reverse) private var playlists: [SavedPlaylist]
+    @Environment(\.themeColor) private var themeColor
+    @State private var showSeedPlaylist = false
 
     @ViewBuilder
     private var appIconImage: some View {
@@ -19,7 +21,7 @@ struct HomeView: View {
         } else {
             Image(systemName: "antenna.radiowaves.left.and.right")
                 .font(.system(size: 50))
-                .foregroundStyle(.orange)
+                .foregroundStyle(themeColor)
         }
         #else
         Image(nsImage: NSApp.applicationIconImage)
@@ -88,6 +90,26 @@ struct HomeView: View {
                     }
                 }
 
+                // MARK: - Quick Actions
+                GroupBox("Quick Actions") {
+                    Button {
+                        showSeedPlaylist = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "wand.and.stars")
+                                .foregroundStyle(themeColor)
+                                .frame(width: 20)
+                            Text("Build Playlist from Song")
+                                .font(.subheadline)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 // MARK: - Quick Stats
                 GroupBox("At a Glance") {
                     HStack {
@@ -112,7 +134,7 @@ struct HomeView: View {
                                 HStack(spacing: 12) {
                                     Image(systemName: "waveform")
                                         .font(.title2)
-                                        .foregroundStyle(.orange)
+                                        .foregroundStyle(themeColor)
                                         .symbolEffect(.variableColor.iterative)
 
                                     VStack(alignment: .leading, spacing: 4) {
@@ -141,7 +163,7 @@ struct HomeView: View {
                                     HStack(spacing: 8) {
                                         Image(systemName: "waveform")
                                             .font(.caption)
-                                            .foregroundStyle(.orange)
+                                            .foregroundStyle(themeColor)
                                         VStack(alignment: .leading) {
                                             Text(bridge.name)
                                                 .font(.subheadline)
@@ -190,6 +212,9 @@ struct HomeView: View {
         .padding(.horizontal)
         .frame(maxHeight: .infinity, alignment: .top)
         .navigationTitle("Home")
+        .sheet(isPresented: $showSeedPlaylist) {
+            SeedPlaylistSheet()
+        }
     }
 
     // MARK: - Helpers
@@ -218,7 +243,7 @@ struct HomeView: View {
         VStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.caption)
-                .foregroundStyle(.orange)
+                .foregroundStyle(themeColor)
             Text("\(value)")
                 .font(.title3.bold())
             Text(label)

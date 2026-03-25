@@ -3,6 +3,7 @@ import SwiftData
 
 struct BridgeShareSheet: View {
     let bridge: Bridge
+    @Environment(\.themeColor) private var themeColor
     @Environment(\.dismiss) private var dismiss
     @Query private var users: [User]
     @State private var copied = false
@@ -76,7 +77,7 @@ struct BridgeShareSheet: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(.orange)
+                        .background(themeColor)
                         .foregroundStyle(.white)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
@@ -98,7 +99,7 @@ struct BridgeShareSheet: View {
         case .child:
             Label("Under 13 — they will be anonymous in the GrooveWire Bridge", systemImage: "lock.fill")
                 .font(.caption)
-                .foregroundStyle(.orange)
+                .foregroundStyle(themeColor)
         case .teen:
             Label("13-17 — private by default, screen name hidden unless they have parental consent", systemImage: "lock.fill")
                 .font(.caption)

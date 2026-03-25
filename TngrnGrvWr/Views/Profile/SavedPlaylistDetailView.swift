@@ -6,6 +6,7 @@ struct SavedPlaylistDetailView: View {
     var onBridgeCreated: ((UUID) -> Void)?
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.themeColor) private var themeColor
     @Query(sort: \Bridge.createdAt, order: .reverse) private var bridges: [Bridge]
     @State private var showBridgePicker = false
     @State private var showTransferSheet = false
@@ -17,7 +18,7 @@ struct SavedPlaylistDetailView: View {
                 HStack(spacing: 14) {
                     Image(systemName: "music.note.list")
                         .font(.largeTitle)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(themeColor)
                         .frame(width: 80, height: 80)
                         .background(.quaternary)
                         .clipShape(RoundedRectangle(cornerRadius: 10))

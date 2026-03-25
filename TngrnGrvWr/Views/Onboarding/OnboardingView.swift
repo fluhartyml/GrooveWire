@@ -4,6 +4,7 @@ import SwiftData
 struct OnboardingView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SpotifyService.self) private var spotifyService
+    @Environment(\.themeColor) private var themeColor
     @State private var displayName = ""
     @State private var email = ""
     @State private var phone = ""
@@ -42,7 +43,7 @@ struct OnboardingView: View {
                 } else {
                     Image(systemName: "antenna.radiowaves.left.and.right")
                         .font(.system(size: 60))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(themeColor)
                 }
 
                 Text("Welcome to GrooveWire")
@@ -132,7 +133,7 @@ struct OnboardingView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(canContinue ? .orange : .gray)
+                    .background(canContinue ? themeColor : .gray)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
             }
@@ -178,7 +179,7 @@ struct OnboardingView: View {
         case .child:
             Label("Under 13 — profile will be private, name hidden in GrooveWire Bridges", systemImage: "lock.fill")
                 .font(.caption)
-                .foregroundStyle(.orange)
+                .foregroundStyle(themeColor)
         case .teen:
             Label("13-17 — profile is private by default", systemImage: "lock.fill")
                 .font(.caption)

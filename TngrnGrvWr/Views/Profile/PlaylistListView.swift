@@ -7,6 +7,7 @@ struct PlaylistListView: View {
 
     @Environment(SpotifyService.self) private var spotifyService
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.themeColor) private var themeColor
     @Query(sort: \Bridge.createdAt, order: .reverse) private var bridges: [Bridge]
     @Query(sort: \SavedPlaylist.createdAt, order: .reverse) private var savedPlaylists: [SavedPlaylist]
     @State private var selectedPlaylist: SavedPlaylist?
@@ -225,7 +226,7 @@ struct PlaylistListView: View {
                 Image(systemName: icon)
                     .font(.body)
                     .frame(width: 24)
-                    .foregroundStyle(isSelected ? .orange : .secondary)
+                    .foregroundStyle(isSelected ? themeColor : .secondary)
 
                 Text(name)
                     .font(.subheadline)
@@ -242,7 +243,7 @@ struct PlaylistListView: View {
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
-            .background(isSelected ? Color.orange.opacity(0.1) : Color.clear)
+            .background(isSelected ? themeColor.opacity(0.1) : Color.clear)
         }
         .buttonStyle(.plain)
     }
@@ -386,6 +387,7 @@ struct AddPlaylistSheet: View {
     @Environment(AppleMusicService.self) private var appleMusicService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.themeColor) private var themeColor
     @State private var mode: AddPlaylistMode = .create
 
     // Create mode
@@ -489,7 +491,7 @@ struct AddPlaylistSheet: View {
                     if !appleMusicService.isConnected {
                         Section {
                             Label("Apple Music is not connected", systemImage: "exclamationmark.triangle")
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(themeColor)
                         }
                     } else if isLoadingAppleMusicPlaylists {
                         Section {
@@ -523,7 +525,7 @@ struct AddPlaylistSheet: View {
                                         Spacer()
                                         if selectedAppleMusicPlaylist?.id == playlist.id {
                                             Image(systemName: "checkmark.circle.fill")
-                                                .foregroundStyle(.orange)
+                                                .foregroundStyle(themeColor)
                                         }
                                     }
                                 }
@@ -886,6 +888,7 @@ struct M3UExportSheet: View {
     @Environment(AppleMusicService.self) private var appleMusicService
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.themeColor) private var themeColor
 
     @State private var isMatching = false
     @State private var matchedCount = 0
@@ -901,7 +904,7 @@ struct M3UExportSheet: View {
             VStack(spacing: 20) {
                 Image(systemName: "music.note.list")
                     .font(.system(size: 48))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(themeColor)
 
                 Text(playlist.name)
                     .font(.headline)
@@ -913,7 +916,7 @@ struct M3UExportSheet: View {
                 if isMatching {
                     VStack(spacing: 8) {
                         ProgressView(value: trackMatchingService.matchProgress)
-                            .tint(.orange)
+                            .tint(themeColor)
                         Text("Matching tracks to Apple Music...")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -938,7 +941,7 @@ struct M3UExportSheet: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.orange)
+                    .tint(themeColor)
                     #endif
 
                     ShareLink(
@@ -1041,6 +1044,7 @@ struct AddTracksToPlaylistSheet: View {
     @Environment(AppleMusicService.self) private var appleMusicService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.themeColor) private var themeColor
     @State private var searchQuery = ""
     @State private var searchResults: [Track] = []
     @State private var isSearching = false
@@ -1121,7 +1125,7 @@ struct AddTracksToPlaylistSheet: View {
                                 addTrack(track)
                             } label: {
                                 Image(systemName: "plus.circle.fill")
-                                    .foregroundStyle(.orange)
+                                    .foregroundStyle(themeColor)
                             }
                             .buttonStyle(.plain)
                         }

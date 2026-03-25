@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BridgeCard: View {
     let bridge: Bridge
+    @Environment(\.themeColor) private var themeColor
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -33,8 +34,8 @@ struct BridgeCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.orange.opacity(0.2))
-                .strokeBorder(Color.orange.opacity(0.5), lineWidth: 1.5)
+                .fill(themeColor.opacity(0.2))
+                .strokeBorder(themeColor.opacity(0.5), lineWidth: 1.5)
         )
     }
 }

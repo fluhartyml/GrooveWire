@@ -4,6 +4,7 @@ import SwiftData
 struct AgeGateView: View {
     let user: User
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.themeColor) private var themeColor
     @State private var birthday = Calendar.current.date(byAdding: .year, value: -18, to: Date()) ?? Date()
     @State private var hasPickedBirthday = false
     @State private var showParentalConsent = false
@@ -34,7 +35,7 @@ struct AgeGateView: View {
             VStack(spacing: 16) {
                 Image(systemName: "calendar.badge.clock")
                     .font(.system(size: 50))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(themeColor)
 
                 Text("One More Thing")
                     .font(.largeTitle.bold())
@@ -106,7 +107,7 @@ struct AgeGateView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(canComplete ? .orange : .gray)
+                    .background(canComplete ? themeColor : .gray)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
             }
@@ -137,7 +138,7 @@ struct AgeGateView: View {
         case .child:
             Label("Under 13 — profile will be private, name hidden in GrooveWire Bridges", systemImage: "lock.fill")
                 .font(.caption)
-                .foregroundStyle(.orange)
+                .foregroundStyle(themeColor)
         case .teen:
             Label("13-17 — profile is private by default", systemImage: "lock.fill")
                 .font(.caption)

@@ -135,6 +135,36 @@ final class AppleMusicService: StreamingServiceProtocol {
         #endif
     }
 
+    // MARK: - Recommendations
+
+    /// Get similar tracks seeded from a single song via MusicKit catalog suggestions.
+    func getRecommendations(seedTrackID: String, limit: Int = 25) async throws -> [Track] {
+        // Fetch the seed song to get its genre/artist context
+        let seedRequest = MusicCatalogResourceRequest<Song>(matching: \.id, equalTo: MusicItemID(seedTrackID))
+        let seedResponse = try await seedRequest.response()
+        guard let seedSong = seedResponse.items.first else { return [] }
+
+        // Search for similar songs using the artist + genre as search terms
+        let searchTerm = "\(seedSong.artistName) \(seedSong.genreNames.first ?? "")"
+        var request = MusicCatalogSearchRequest(term: searchTerm, types: [Song.self])
+        request.limit = limit
+        let response = try await request.response()
+
+        return response.songs
+            .filter { $0.id.rawValue != seedTrackID } // Exclude the seed itself
+            .map { song in
+                Track(
+                    title: song.title,
+                    artist: song.artistName,
+                    albumTitle: song.albumTitle,
+                    artworkURL: song.artwork?.url(width: 300, height: 300)?.absoluteString,
+                    appleMusicID: song.id.rawValue,
+                    durationSeconds: song.duration ?? 0,
+                    addedBy: UUID()
+                )
+            }
+    }
+
     // MARK: - Playback
 
     func play(track: Track) async throws {

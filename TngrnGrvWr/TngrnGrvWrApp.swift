@@ -14,6 +14,7 @@ struct TngrnGrvWrApp: App {
     @State private var appleMusicService = AppleMusicService()
     @State private var playbackManager: PlaybackManager?
     @State private var trackMatchingService: TrackMatchingService?
+    @State private var themeManager = ThemeManager()
     @State private var pendingBridgeID: UUID?
 
     var sharedModelContainer: ModelContainer = {
@@ -40,6 +41,9 @@ struct TngrnGrvWrApp: App {
                 .environment(appleMusicService)
                 .environment(playbackManager ?? PlaybackManager(spotifyService: spotifyService, appleMusicService: appleMusicService))
                 .environment(trackMatchingService ?? TrackMatchingService(spotifyService: spotifyService, appleMusicService: appleMusicService))
+                .environment(themeManager)
+                .environment(\.themeColor, themeManager.accentColor)
+                .tint(themeManager.accentColor)
                 .onAppear {
                     if playbackManager == nil {
                         playbackManager = PlaybackManager(spotifyService: spotifyService, appleMusicService: appleMusicService)

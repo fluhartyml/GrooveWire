@@ -16,10 +16,12 @@ struct BridgeView: View {
     @State private var showDeleteConfirm = false
     @State private var showMembers = false
     @State private var showAddPlaylist = false
+    @State private var showSeedPlaylist = false
     @State private var selectedTrackID: UUID?
     @State private var djMode = false
     @State private var queueVersion = 0
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.themeColor) private var themeColor
 
     var body: some View {
         List {
@@ -94,6 +96,12 @@ struct BridgeView: View {
                             Label("Add Playlist", systemImage: "text.badge.plus")
                         }
 
+                        Button {
+                            showSeedPlaylist = true
+                        } label: {
+                            Label("Build Playlist from Song", systemImage: "wand.and.stars")
+                        }
+
                         Toggle("Private GrooveWire Bridge", isOn: Binding(
                             get: { !bridge.isPublic },
                             set: { bridge.isPublic = !$0 }
@@ -134,6 +142,9 @@ struct BridgeView: View {
         }
         .sheet(isPresented: $showAddPlaylist) {
             AddPlaylistToBridgeSheet(bridge: bridge)
+        }
+        .sheet(isPresented: $showSeedPlaylist) {
+            SeedPlaylistSheet()
         }
         .alert("Rename GrooveWire Bridge", isPresented: $showRename) {
             TextField("GrooveWire Bridge name", text: $renameText)
@@ -245,7 +256,7 @@ struct BridgeView: View {
                         selectedTrackID = selectedTrackID == track.id ? nil : track.id
                     }
                     .listRowBackground(
-                        selectedTrackID == track.id ? Color.orange.opacity(0.15) : nil
+                        selectedTrackID == track.id ? themeColor.opacity(0.15) : nil
                     )
                     .contextMenu {
                         Button {

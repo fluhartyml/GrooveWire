@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ServiceBadge: View {
     let service: StreamingService
+    @Environment(\.themeColor) private var themeColor
 
     var body: some View {
         switch service {
@@ -9,7 +10,7 @@ struct ServiceBadge: View {
             Image(systemName: "apple.logo")
                 .font(.caption2)
                 .foregroundStyle(.yellow)
-                .shadow(color: .orange.opacity(0.6), radius: 2)
+                .shadow(color: themeColor.opacity(0.6), radius: 2)
         case .spotify:
             Image(systemName: "dot.radiowaves.left.and.right")
                 .font(.caption2)
