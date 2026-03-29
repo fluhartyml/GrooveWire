@@ -199,6 +199,19 @@ final class SpotifyService: StreamingServiceProtocol {
         return nil
     }
 
+    func fetchPlaylistName(playlistID: String) async throws -> String {
+        let token = try await authManager.validToken()
+        let url = URL(string: "\(baseURL)/playlists/\(playlistID)?fields=name")!
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: request)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let name = json["name"] as? String else {
+            return "Spotify Playlist"
+        }
+        return name
+    }
+
     func fetchPlaylistTracks(playlistID: String) async throws -> [Track] {
         let token = try await authManager.validToken()
         var allTracks: [Track] = []

@@ -310,10 +310,11 @@ struct ImportPlaylistSheet: View {
         errorMessage = nil
 
         do {
+            let playlistName = try await spotifyService.fetchPlaylistName(playlistID: playlistID)
             let tracks = try await spotifyService.fetchPlaylistTracks(playlistID: playlistID)
 
             let savedPlaylist = SavedPlaylist(
-                name: "Spotify Playlist",
+                name: playlistName,
                 spotifyPlaylistID: playlistID,
                 isPublic: false
             )
