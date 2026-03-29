@@ -3,16 +3,14 @@ import SwiftData
 
 struct SavedPlaylistDetailView: View {
     let playlist: SavedPlaylist
-    var onBridgeCreated: ((UUID) -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.themeColor) private var themeColor
     @Environment(AppleMusicService.self) private var appleMusicService
-    @Query(sort: \Bridge.createdAt, order: .reverse) private var bridges: [Bridge]
-    @State private var showBridgePicker = false
     @State private var showTransferSheet = false
     @State private var showExportSheet = false
     @State private var showMusicTransferSheet = false
+    @State private var showShareSheet = false
 
     private var canTransferToMusic: Bool {
         #if os(macOS)
@@ -57,20 +55,6 @@ struct SavedPlaylistDetailView: View {
             }
 
             Section {
-                Button {
-                    createBridgeFromPlaylist()
-                } label: {
-                    Label("Create GrooveWire Bridge from Playlist", systemImage: "plus.circle")
-                }
-                .disabled(playlist.trackList.isEmpty)
-
-                Button {
-                    showBridgePicker = true
-                } label: {
-                    Label("Load into Existing GrooveWire Bridge", systemImage: "antenna.radiowaves.left.and.right")
-                }
-                .disabled(playlist.trackList.isEmpty)
-
                 #if os(macOS)
                 if canTransferToMusic {
                     Button {
@@ -95,6 +79,13 @@ struct SavedPlaylistDetailView: View {
                     Label("Export Playlist", systemImage: "square.and.arrow.up")
                 }
                 .disabled(playlist.trackList.isEmpty)
+
+                Button {
+                    showShareSheet = true
+                } label: {
+                    Label("Share Playlist", systemImage: "paperplane")
+                }
+                .disabled(playlist.trackList.isEmpty)
             }
 
             Section("Tracks") {
@@ -115,47 +106,14 @@ struct SavedPlaylistDetailView: View {
         .sheet(isPresented: $showTransferSheet) {
             PlaylistTransferSheet(playlist: playlist)
         }
-        .sheet(isPresented: $showBridgePicker) {
-            BridgePickerSheet(tracks: playlist.trackList, bridges: bridges) { bridge in
-                for track in playlist.trackList {
-                    bridge.trackList.append(track)
-                }
-                try? modelContext.save()
-            }
-        }
         .sheet(isPresented: $showExportSheet) {
             M3UExportSheet(playlist: playlist)
         }
         .sheet(isPresented: $showMusicTransferSheet) {
             PlaylistTransferToMusicSheet(playlist: playlist)
         }
-    }
-
-    private func createBridgeFromPlaylist() {
-        let bridge = Bridge(
-            name: playlist.name,
-            hostID: UUID(),
-            isPublic: false
-        )
-        modelContext.insert(bridge)
-
-        for track in playlist.trackList {
-            let bridgeTrack = Track(
-                title: track.title,
-                artist: track.artist,
-                albumTitle: track.albumTitle,
-                artworkURL: track.artworkURL,
-                appleMusicID: track.appleMusicID,
-                spotifyID: track.spotifyID,
-                durationSeconds: track.durationSeconds,
-                addedBy: UUID()
-            )
-            modelContext.insert(bridgeTrack)
-            bridge.trackList.append(bridgeTrack)
+        .sheet(isPresented: $showShareSheet) {
+            PlaylistShareSheet(playlist: playlist)
         }
-
-        try? modelContext.save()
-        print("[Library] Created bridge '\(playlist.name)' with \(playlist.trackCount) tracks")
-        onBridgeCreated?(bridge.id)
     }
 }

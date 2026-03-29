@@ -3,13 +3,10 @@ import SwiftData
 import MusicKit
 
 struct ProfileView: View {
-    var onBridgeCreated: ((UUID) -> Void)?
-
     @Environment(SpotifyService.self) private var spotifyService
     @Environment(AppleMusicService.self) private var appleMusicService
     @Environment(\.modelContext) private var modelContext
     @Query private var users: [User]
-    @Environment(ThemeManager.self) private var themeManager
     @State private var showSpotifyLogin = false
 
     private var currentUser: User? { users.first }
@@ -68,19 +65,7 @@ struct ProfileView: View {
                 } header: {
                     Text("Spotify Remote")
                 } footer: {
-                    Text("GrooveWire controls Spotify on your other devices. Select where you want music to play — your Mac, TV, speaker, or phone. Spotify must be open on the target device.")
-                }
-            }
-
-            if spotifyService.isConnected {
-                Section {
-                    NavigationLink(destination: PlaylistListView(onBridgeCreated: onBridgeCreated)) {
-                        Label("My Library", systemImage: "rectangle.split.1x2")
-                    }
-                } header: {
-                    Text("Spotify Library")
-                } footer: {
-                    Text("Browse your playlists and songs. Load them into a GrooveWire Bridge.")
+                    Text("Control Spotify on your other devices. Select where you want music to play — your Mac, TV, speaker, or phone. Spotify must be open on the target device.")
                 }
             }
 
@@ -119,16 +104,6 @@ struct ProfileView: View {
                             Text("Private (age-restricted)")
                                 .foregroundStyle(.secondary)
                         }
-                    }
-                }
-            }
-
-            Section("Appearance") {
-                @Bindable var tm = themeManager
-                Picker("Theme", selection: $tm.currentTheme) {
-                    ForEach(AppTheme.allCases) { theme in
-                        Label(theme.displayName, systemImage: theme.icon)
-                            .tag(theme)
                     }
                 }
             }

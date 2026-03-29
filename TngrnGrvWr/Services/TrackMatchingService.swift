@@ -4,18 +4,9 @@ import os
 
 private let matchLogger = Logger(subsystem: "com.TangerineGrooveWire.TngrnGrvWr", category: "TrackMatch")
 
-/// Debug log file for diagnosing match failures
+/// Log match operations via os.Logger (no temp file writes)
 private func debugLog(_ message: String) {
     matchLogger.info("\(message)")
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent("groovewire-match-debug.log")
-    let line = "\(Date()): \(message)\n"
-    if let handle = try? FileHandle(forWritingTo: url) {
-        handle.seekToEndOfFile()
-        handle.write(line.data(using: .utf8) ?? Data())
-        handle.closeFile()
-    } else {
-        try? line.write(to: url, atomically: true, encoding: .utf8)
-    }
 }
 
 // MARK: - Match Confidence

@@ -2,14 +2,16 @@ import SwiftUI
 import SwiftData
 
 struct HomeView: View {
-    var onBridgeTap: ((UUID) -> Void)?
-
     @Environment(SpotifyService.self) private var spotifyService
     @Environment(AppleMusicService.self) private var appleMusicService
-    @Query(sort: \Bridge.createdAt, order: .reverse) private var bridges: [Bridge]
     @Query(sort: \SavedPlaylist.createdAt, order: .reverse) private var playlists: [SavedPlaylist]
     @Environment(\.themeColor) private var themeColor
-    @State private var showSeedPlaylist = false
+    @State private var showProfile = false
+    @State private var showFAQ = false
+
+    private var totalTracks: Int {
+        playlists.reduce(0) { $0 + $1.trackCount }
+    }
 
     @ViewBuilder
     private var appIconImage: some View {
@@ -30,16 +32,9 @@ struct HomeView: View {
         #endif
     }
 
-    private var activeBridges: [Bridge] {
-        bridges.filter { $0.isActive }
-    }
-
-    private var totalTracks: Int {
-        bridges.reduce(0) { $0 + $1.trackList.count }
-    }
-
     var body: some View {
-        VStack(spacing: 16) {
+        ScrollView {
+            VStack(spacing: 16) {
                 // MARK: - Hero
                 VStack(spacing: 8) {
                     appIconImage
@@ -50,6 +45,10 @@ struct HomeView: View {
                     Text("GrooveWire")
                         .font(.title2.bold())
                         .foregroundStyle(.primary)
+
+                    Text("Bridging the gap")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
                     HStack(spacing: 4) {
                         Image("ClaudeLogo")
@@ -63,6 +62,28 @@ struct HomeView: View {
                     }
                 }
                 .padding(.top, 12)
+
+                // MARK: - Quick Stats
+                GroupBox("At a Glance") {
+                    HStack {
+                        statCard(value: playlists.count, label: "Playlists", icon: "music.note.list")
+                        Divider()
+                        statCard(value: totalTracks, label: "Tracks", icon: "music.note")
+                        Divider()
+                        statCard(
+                            value: playlists.filter { $0.spotifyPlaylistID != nil }.count,
+                            label: "Spotify",
+                            icon: "dot.radiowaves.left.and.right"
+                        )
+                        Divider()
+                        statCard(
+                            value: playlists.filter { $0.appleMusicPlaylistID != nil }.count,
+                            label: "Apple Music",
+                            icon: "apple.logo"
+                        )
+                    }
+                    .padding(.vertical, 4)
+                }
 
                 // MARK: - Services
                 GroupBox("Streaming Services") {
@@ -80,140 +101,52 @@ struct HomeView: View {
                             connected: appleMusicService.isConnected,
                             color: .mint
                         )
-
-                        if !spotifyService.isConnected && !appleMusicService.isConnected {
-                            Text("Head to the Profile tab to connect a service.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .padding(.top, 4)
-                        }
                     }
                 }
 
                 // MARK: - Quick Actions
                 GroupBox("Quick Actions") {
-                    Button {
-                        showSeedPlaylist = true
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "wand.and.stars")
-                                .foregroundStyle(themeColor)
-                                .frame(width: 20)
-                            Text("Build Playlist from Song")
-                                .font(.subheadline)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
+                    VStack(spacing: 8) {
+                        Button {
+                            showProfile = true
+                        } label: {
+                            actionRow(icon: "person.fill", title: "Profile", subtitle: "Manage your account and service connections")
                         }
-                    }
-                    .buttonStyle(.plain)
-                }
+                        .buttonStyle(.plain)
 
-                // MARK: - Quick Stats
-                GroupBox("At a Glance") {
-                    HStack {
-                        statCard(value: bridges.count, label: "GW Bridges", icon: "antenna.radiowaves.left.and.right")
                         Divider()
-                        statCard(value: activeBridges.count, label: "Active", icon: "bolt.fill")
-                        Divider()
-                        statCard(value: totalTracks, label: "Tracks", icon: "music.note")
-                        Divider()
-                        statCard(value: playlists.count, label: "Playlists", icon: "music.note.list")
-                    }
-                    .padding(.vertical, 4)
-                }
 
-                // MARK: - Now Listening
-                if let activeBridge = activeBridges.first {
-                    GroupBox("Now Listening") {
-                        VStack(spacing: 8) {
-                            Button {
-                                onBridgeTap?(activeBridge.id)
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "waveform")
-                                        .font(.title2)
-                                        .foregroundStyle(themeColor)
-                                        .symbolEffect(.variableColor.iterative)
-
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(activeBridge.name)
-                                            .font(.headline)
-                                        if let track = activeBridge.trackList.first {
-                                            Text("\(track.artist) — \(track.title)")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                                .lineLimit(1)
-                                        }
-                                        Text("\(activeBridge.participantCount) listening")
-                                            .font(.caption2)
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                    Spacer()
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            ForEach(activeBridges.dropFirst().prefix(2)) { bridge in
-                                Divider()
-                                Button {
-                                    onBridgeTap?(bridge.id)
-                                } label: {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "waveform")
-                                            .font(.caption)
-                                            .foregroundStyle(themeColor)
-                                        VStack(alignment: .leading) {
-                                            Text(bridge.name)
-                                                .font(.subheadline)
-                                            Text("\(bridge.participantCount) listening")
-                                                .font(.caption2)
-                                                .foregroundStyle(.tertiary)
-                                        }
-                                        Spacer()
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            }
+                        Button {
+                            showFAQ = true
+                        } label: {
+                            actionRow(icon: "questionmark.circle", title: "Support", subtitle: "FAQ and help documentation")
                         }
-                    }
-                }
-
-                // MARK: - Recent Bridges
-                if !bridges.isEmpty && activeBridges.isEmpty {
-                    GroupBox("Recent GrooveWire Bridges") {
-                        VStack(spacing: 8) {
-                            ForEach(Array(bridges.prefix(3).enumerated()), id: \.element.id) { index, bridge in
-                                if index > 0 { Divider() }
-                                Button {
-                                    onBridgeTap?(bridge.id)
-                                } label: {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(bridge.name)
-                                                .font(.subheadline)
-                                            Text("\(bridge.trackList.count) tracks · \(bridge.participantCount) members")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        Text(bridge.createdAt, style: .relative)
-                                            .font(.caption2)
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
-        .padding(.horizontal)
-        .frame(maxHeight: .infinity, alignment: .top)
+            .padding(.horizontal)
+        }
         .navigationTitle("Home")
-        .sheet(isPresented: $showSeedPlaylist) {
-            SeedPlaylistSheet()
+        .sheet(isPresented: $showProfile) {
+            NavigationStack {
+                ProfileView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") { showProfile = false }
+                        }
+                    }
+            }
+        }
+        .sheet(isPresented: $showFAQ) {
+            NavigationStack {
+                FAQView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") { showFAQ = false }
+                        }
+                    }
+            }
         }
     }
 
@@ -251,6 +184,25 @@ struct HomeView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private func actionRow(icon: String, title: String, subtitle: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .foregroundStyle(themeColor)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
     }
 }
 

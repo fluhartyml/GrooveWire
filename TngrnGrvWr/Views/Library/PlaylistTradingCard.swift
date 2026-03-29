@@ -1,18 +1,18 @@
 import SwiftUI
 
-struct BridgeTradingCard: View {
-    let bridge: Bridge
+struct PlaylistTradingCard: View {
+    let playlist: SavedPlaylist
     @Environment(\.themeColor) private var themeColor
 
     var body: some View {
         VStack(spacing: 0) {
             // Header
             VStack(spacing: 8) {
-                Image(systemName: "antenna.radiowaves.left.and.right")
+                Image(systemName: "music.note.list")
                     .font(.title)
                     .foregroundStyle(themeColor)
 
-                Text(bridge.name)
+                Text(playlist.name)
                     .font(.title2.bold())
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
@@ -26,7 +26,7 @@ struct BridgeTradingCard: View {
 
             // Track list preview
             VStack(alignment: .leading, spacing: 4) {
-                ForEach(Array(bridge.trackList.prefix(4).enumerated()), id: \.offset) { index, track in
+                ForEach(Array(playlist.trackList.prefix(4).enumerated()), id: \.offset) { index, track in
                     HStack {
                         Text("\(index + 1).")
                             .font(.caption.monospacedDigit())
@@ -36,8 +36,8 @@ struct BridgeTradingCard: View {
                             .lineLimit(1)
                     }
                 }
-                if bridge.trackList.count > 4 {
-                    Text("+ \(bridge.trackList.count - 4) more")
+                if playlist.trackList.count > 4 {
+                    Text("+ \(playlist.trackList.count - 4) more")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -48,7 +48,7 @@ struct BridgeTradingCard: View {
 
             // Footer
             HStack {
-                Text("\(bridge.trackList.count) tracks")
+                Text("\(playlist.trackList.count) tracks")
                     .font(.caption2)
                 Spacer()
                 Text("Tangerine GrooveWire")
@@ -72,7 +72,7 @@ struct BridgeTradingCard: View {
 
     @ViewBuilder
     private var artworkGrid: some View {
-        let artworks = bridge.trackList.prefix(4).compactMap { $0.artworkURL }
+        let artworks = playlist.trackList.prefix(4).compactMap { $0.artworkURL }
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 4) {
             ForEach(0..<4, id: \.self) { index in
                 if index < artworks.count, let url = URL(string: artworks[index]) {
@@ -101,9 +101,9 @@ struct BridgeTradingCard: View {
     }
 }
 
-// MARK: - Render to Image
+// MARK: - Render to Image (for sharing)
 
-extension BridgeTradingCard {
+extension PlaylistTradingCard {
     @MainActor
     func renderToImage() -> Image? {
         let renderer = ImageRenderer(content: self)

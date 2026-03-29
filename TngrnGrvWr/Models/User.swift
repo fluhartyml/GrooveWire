@@ -87,18 +87,6 @@ final class User {
         }
     }
 
-    func bridgeDisplayName(isSelf: Bool) -> String {
-        if isSelf { return displayName }
-        switch ageCategory {
-        case .child:
-            return "Listener"
-        case .teen:
-            return parentalConsentAcknowledged ? displayName : "Listener"
-        case .adult, .unknown:
-            return displayName
-        }
-    }
-
     // MARK: - Helpers
 
     static func computeAgeCategory(from birthday: Date) -> AgeCategory {

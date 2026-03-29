@@ -14,15 +14,13 @@ struct TngrnGrvWrApp: App {
     @State private var appleMusicService = AppleMusicService()
     @State private var playbackManager: PlaybackManager?
     @State private var trackMatchingService: TrackMatchingService?
-    @State private var themeManager = ThemeManager()
-    @State private var pendingBridgeID: UUID?
+
+    private let accentColor = Color(red: 1.0, green: 0.52, blue: 0.0) // Tangerine
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             User.self,
-            Bridge.self,
             Track.self,
-            Message.self,
             SavedPlaylist.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
@@ -41,9 +39,8 @@ struct TngrnGrvWrApp: App {
                 .environment(appleMusicService)
                 .environment(playbackManager ?? PlaybackManager(spotifyService: spotifyService, appleMusicService: appleMusicService))
                 .environment(trackMatchingService ?? TrackMatchingService(spotifyService: spotifyService, appleMusicService: appleMusicService))
-                .environment(themeManager)
-                .environment(\.themeColor, themeManager.accentColor)
-                .tint(themeManager.accentColor)
+                .environment(\.themeColor, accentColor)
+                .tint(accentColor)
                 .onAppear {
                     if playbackManager == nil {
                         playbackManager = PlaybackManager(spotifyService: spotifyService, appleMusicService: appleMusicService)
@@ -52,23 +49,10 @@ struct TngrnGrvWrApp: App {
                         trackMatchingService = TrackMatchingService(spotifyService: spotifyService, appleMusicService: appleMusicService)
                     }
                 }
-                .onOpenURL { url in
-                    handleDeepLink(url)
-                }
         }
         #if os(macOS)
         .defaultSize(width: 700, height: 650)
         #endif
         .modelContainer(sharedModelContainer)
-    }
-
-    private func handleDeepLink(_ url: URL) {
-        // tngrnGrvWr://bridge/<UUID>
-        guard url.scheme == "tngrnGrvWr",
-              url.host == "bridge",
-              let idString = url.pathComponents.last,
-              let bridgeID = UUID(uuidString: idString) else { return }
-        pendingBridgeID = bridgeID
-        print("[DeepLink] Received invite for bridge: \(bridgeID)")
     }
 }
