@@ -39,6 +39,7 @@ struct ImportPlaylistSheet: View {
     @State private var isLoading = false
     @State private var statusMessage = ""
     @State private var errorMessage: String?
+    @State private var successMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -155,6 +156,18 @@ struct ImportPlaylistSheet: View {
                         Text(statusMessage)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                    }
+                }
+
+                if let success = successMessage {
+                    Section {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            Text(success)
+                                .foregroundStyle(.green)
+                        }
+                        .font(.callout)
                     }
                 }
 
@@ -335,6 +348,9 @@ struct ImportPlaylistSheet: View {
             }
 
             try modelContext.save()
+            isLoading = false
+            successMessage = "Imported \"\(playlistName)\" — \(tracks.count) tracks"
+            try? await Task.sleep(for: .seconds(1.5))
             dismiss()
         } catch {
             errorMessage = "Failed to fetch playlist: \(error.localizedDescription)"
