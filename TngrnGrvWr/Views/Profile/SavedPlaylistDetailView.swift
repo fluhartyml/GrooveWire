@@ -7,10 +7,21 @@ struct SavedPlaylistDetailView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.themeColor) private var themeColor
+    @Environment(AppleMusicService.self) private var appleMusicService
     @Query(sort: \Bridge.createdAt, order: .reverse) private var bridges: [Bridge]
     @State private var showBridgePicker = false
     @State private var showTransferSheet = false
     @State private var showExportSheet = false
+    @State private var showMusicTransferSheet = false
+
+    private var canTransferToMusic: Bool {
+        #if os(macOS)
+        let hasSpotifyTracks = playlist.trackList.contains(where: { $0.spotifyID != nil })
+        return hasSpotifyTracks && appleMusicService.isConnected
+        #else
+        return false
+        #endif
+    }
 
     var body: some View {
         List {
@@ -60,6 +71,17 @@ struct SavedPlaylistDetailView: View {
                 }
                 .disabled(playlist.trackList.isEmpty)
 
+                #if os(macOS)
+                if canTransferToMusic {
+                    Button {
+                        showMusicTransferSheet = true
+                    } label: {
+                        Label("Transfer to Apple Music", systemImage: "apple.logo")
+                    }
+                    .disabled(playlist.trackList.isEmpty)
+                }
+                #endif
+
                 Button {
                     showTransferSheet = true
                 } label: {
@@ -103,6 +125,9 @@ struct SavedPlaylistDetailView: View {
         }
         .sheet(isPresented: $showExportSheet) {
             M3UExportSheet(playlist: playlist)
+        }
+        .sheet(isPresented: $showMusicTransferSheet) {
+            PlaylistTransferToMusicSheet(playlist: playlist)
         }
     }
 

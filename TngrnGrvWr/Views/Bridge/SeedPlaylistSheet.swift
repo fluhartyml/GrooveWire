@@ -294,14 +294,17 @@ struct SeedPlaylistSheet: View {
             do {
                 var recs: [Track] = []
 
-                // Try Spotify recommendations first (better algorithm)
-                if spotifyService.isConnected, let spotifyID = track.spotifyID {
-                    recs = try await spotifyService.getRecommendations(seedTrackID: spotifyID, limit: 25)
+                // Apple Music recommendations (MusicKit artist+genre search)
+                if appleMusicService.isConnected, let appleMusicID = track.appleMusicID {
+                    recs = try await appleMusicService.getRecommendations(seedTrackID: appleMusicID, limit: 25)
                 }
 
-                // If no Spotify results, try Apple Music
-                if recs.isEmpty, appleMusicService.isConnected, let appleMusicID = track.appleMusicID {
-                    recs = try await appleMusicService.getRecommendations(seedTrackID: appleMusicID, limit: 25)
+                // Fallback: if no Apple Music results, try Spotify search for similar artist
+                if recs.isEmpty, spotifyService.isConnected {
+                    recs = try await spotifyService.search(query: "\(track.artist) \(track.albumTitle ?? "")")
+                    // Filter out the seed track itself
+                    recs = recs.filter { $0.spotifyID != track.spotifyID }
+                    recs = Array(recs.prefix(25))
                 }
 
                 recommendations = recs

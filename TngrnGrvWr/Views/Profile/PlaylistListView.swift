@@ -6,6 +6,7 @@ struct PlaylistListView: View {
     var onBridgeCreated: ((UUID) -> Void)?
 
     @Environment(SpotifyService.self) private var spotifyService
+    @Environment(AppleMusicService.self) private var appleMusicService
     @Environment(\.modelContext) private var modelContext
     @Environment(\.themeColor) private var themeColor
     @Query(sort: \Bridge.createdAt, order: .reverse) private var bridges: [Bridge]
@@ -14,6 +15,7 @@ struct PlaylistListView: View {
     @State private var showBridgePicker = false
     @State private var showAddPlaylist = false
     @State private var transferTarget: SavedPlaylist?
+    @State private var musicTransferTarget: SavedPlaylist?
     @State private var exportPlaylist: SavedPlaylist?
     @State private var searchTargetPlaylist: SavedPlaylist?
     @State private var isSyncing = false
@@ -84,6 +86,16 @@ struct PlaylistListView: View {
                                 Label(playlist.isPublic ? "Make Private" : "Make Public",
                                       systemImage: playlist.isPublic ? "lock.fill" : "globe")
                             }
+
+                            #if os(macOS)
+                            if playlist.trackList.contains(where: { $0.spotifyID != nil }) && appleMusicService.isConnected {
+                                Button {
+                                    musicTransferTarget = playlist
+                                } label: {
+                                    Label("Transfer to Apple Music", systemImage: "apple.logo")
+                                }
+                            }
+                            #endif
 
                             Button {
                                 transferTarget = playlist
@@ -203,6 +215,9 @@ struct PlaylistListView: View {
         }
         .sheet(item: $transferTarget) { playlist in
             PlaylistTransferSheet(playlist: playlist)
+        }
+        .sheet(item: $musicTransferTarget) { playlist in
+            PlaylistTransferToMusicSheet(playlist: playlist)
         }
         .sheet(item: $exportPlaylist) { playlist in
             M3UExportSheet(playlist: playlist)

@@ -410,58 +410,6 @@ final class SpotifyService: StreamingServiceProtocol {
         return Double(progressMs) / 1000.0
     }
 
-    // MARK: - Recommendations
-
-    /// Get track recommendations seeded from a single track.
-    /// Returns up to `limit` tracks similar to the seed.
-    func getRecommendations(seedTrackID: String, limit: Int = 25) async throws -> [Track] {
-        let token = try await authManager.validToken()
-        var components = URLComponents(string: "\(baseURL)/recommendations")!
-        components.queryItems = [
-            URLQueryItem(name: "seed_tracks", value: seedTrackID),
-            URLQueryItem(name: "limit", value: String(limit))
-        ]
-        let url = components.url!
-
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        print("[SpotifyService] recommendations HTTP \(status)")
-        try checkResponse(response, data: data)
-
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let tracks = json["tracks"] as? [[String: Any]] else {
-            return []
-        }
-
-        return tracks.compactMap { item -> Track? in
-            guard let id = item["id"] as? String,
-                  let name = item["name"] as? String,
-                  let durationMs = item["duration_ms"] as? Int,
-                  let artists = item["artists"] as? [[String: Any]],
-                  let artistName = artists.first?["name"] as? String else {
-                return nil
-            }
-
-            let album = item["album"] as? [String: Any]
-            let albumName = album?["name"] as? String
-            let images = album?["images"] as? [[String: Any]]
-            let artworkURL = images?.first?["url"] as? String
-
-            return Track(
-                title: name,
-                artist: artistName,
-                albumTitle: albumName,
-                artworkURL: artworkURL,
-                spotifyID: id,
-                durationSeconds: Double(durationMs) / 1000.0,
-                addedBy: UUID()
-            )
-        }
-    }
-
     // MARK: - Transfer Playback
 
     func transferPlayback(to deviceID: String) async throws {
