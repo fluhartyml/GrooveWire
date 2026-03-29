@@ -1,5 +1,22 @@
 import Foundation
 import Observation
+import os
+
+private let matchLogger = Logger(subsystem: "com.TangerineGrooveWire.TngrnGrvWr", category: "TrackMatch")
+
+/// Debug log file for diagnosing match failures
+private func debugLog(_ message: String) {
+    matchLogger.info("\(message)")
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("groovewire-match-debug.log")
+    let line = "\(Date()): \(message)\n"
+    if let handle = try? FileHandle(forWritingTo: url) {
+        handle.seekToEndOfFile()
+        handle.write(line.data(using: .utf8) ?? Data())
+        handle.closeFile()
+    } else {
+        try? line.write(to: url, atomically: true, encoding: .utf8)
+    }
+}
 
 // MARK: - Match Confidence
 
@@ -53,24 +70,28 @@ final class TrackMatchingService {
     /// If the track has a Spotify ID but no Apple Music ID, search Apple Music (and vice versa).
     func findMatch(for track: Track, on targetService: StreamingService) async -> TrackMatchResult {
         let query = "\(track.artist) \(track.title)"
-        print("[TrackMatch] Searching \(targetService.displayName) for: \(query)")
+        debugLog("Searching \(targetService.displayName) for: \(query)")
 
         do {
             let results: [Track]
             switch targetService {
             case .spotify:
                 guard spotifyService.isConnected else {
+                    debugLog("Spotify not connected — skipping")
                     return TrackMatchResult(originalTrack: track, matchedTrack: nil, confidence: .noMatch, targetService: targetService)
                 }
                 results = try await spotifyService.search(query: query)
             case .appleMusic:
                 guard appleMusicService.isConnected else {
+                    debugLog("Apple Music not connected — skipping")
                     return TrackMatchResult(originalTrack: track, matchedTrack: nil, confidence: .noMatch, targetService: targetService)
                 }
                 results = try await appleMusicService.search(query: query)
             case .none:
                 return TrackMatchResult(originalTrack: track, matchedTrack: nil, confidence: .noMatch, targetService: targetService)
             }
+
+            debugLog("Got \(results.count) results for: \(query)")
 
             // Score each result against the original
             let scored = results.map { candidate -> (Track, MatchConfidence) in
@@ -80,15 +101,15 @@ final class TrackMatchingService {
 
             // Pick the best match
             if let best = scored.sorted(by: { $0.1 < $1.1 }).first, best.1 != .noMatch {
-                print("[TrackMatch] Found \(best.1.rawValue) match: \(best.0.title) by \(best.0.artist)")
+                debugLog("Found \(best.1.rawValue) match: \(best.0.title) by \(best.0.artist)")
                 return TrackMatchResult(originalTrack: track, matchedTrack: best.0, confidence: best.1, targetService: targetService)
             }
 
-            print("[TrackMatch] No match found for: \(track.title) by \(track.artist)")
+            debugLog("No match found for: \(track.title) by \(track.artist)")
             return TrackMatchResult(originalTrack: track, matchedTrack: nil, confidence: .noMatch, targetService: targetService)
 
         } catch {
-            print("[TrackMatch] Search failed: \(error.localizedDescription)")
+            debugLog("Search FAILED for \(track.title): \(error.localizedDescription)")
             return TrackMatchResult(originalTrack: track, matchedTrack: nil, confidence: .noMatch, targetService: targetService)
         }
     }
