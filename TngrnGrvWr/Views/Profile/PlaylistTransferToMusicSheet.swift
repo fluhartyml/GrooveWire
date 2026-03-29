@@ -590,40 +590,32 @@ struct PlaylistTransferToMusicSheet: View {
     }
 
     #if os(macOS)
-    /// Save M3U to Downloads and open in Music.app
+    /// Save M3U via NSSavePanel and open in Music.app
     private func saveToDownloadsAndOpenInMusic() {
-        guard let sourceURL = m3uURL else { return }
-        let filename = "\(sanitizedFilename()) (GrooveWire).m3u"
+        guard let savedURL = saveViaPanel() else { return }
 
-        do {
-            let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
-            let destURL = downloadsURL.appendingPathComponent(filename)
+        // Open in Music.app
+        let musicAppURL = URL(fileURLWithPath: "/System/Applications/Music.app")
+        NSWorkspace.shared.open(
+            [savedURL],
+            withApplicationAt: musicAppURL,
+            configuration: NSWorkspace.OpenConfiguration()
+        )
 
-            // Remove existing file if present
-            if FileManager.default.fileExists(atPath: destURL.path) {
-                try FileManager.default.removeItem(at: destURL)
-            }
-            try FileManager.default.copyItem(at: sourceURL, to: destURL)
-            savedToDownloads = true
-
-            // Open in Music.app
-            let musicAppURL = URL(fileURLWithPath: "/System/Applications/Music.app")
-            NSWorkspace.shared.open(
-                [destURL],
-                withApplicationAt: musicAppURL,
-                configuration: NSWorkspace.OpenConfiguration()
-            )
-
-            phase = .complete
-        } catch {
-            errorMessage = error.localizedDescription
-            phase = .failed
-        }
+        savedToDownloads = true
+        phase = .complete
     }
 
-    /// Save M3U via NSSavePanel to user-chosen location
+    /// Save M3U via NSSavePanel only (no auto-open)
     private func saveToFile() {
-        guard let sourceURL = m3uURL else { return }
+        guard saveViaPanel() != nil else { return }
+        savedToDownloads = true
+    }
+
+    /// Shared NSSavePanel logic — returns saved URL or nil if cancelled
+    @discardableResult
+    private func saveViaPanel() -> URL? {
+        guard let sourceURL = m3uURL else { return nil }
         let filename = "\(sanitizedFilename()) (GrooveWire).m3u"
 
         let panel = NSSavePanel()
@@ -633,14 +625,16 @@ struct PlaylistTransferToMusicSheet: View {
         panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
 
         let response = panel.runModal()
-        guard response == .OK, let destURL = panel.url else { return }
+        guard response == .OK, let destURL = panel.url else { return nil }
 
         do {
             let data = try Data(contentsOf: sourceURL)
             try data.write(to: destURL)
+            return destURL
         } catch {
             errorMessage = error.localizedDescription
             phase = .failed
+            return nil
         }
     }
     #endif
