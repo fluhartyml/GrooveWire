@@ -6,6 +6,30 @@ import UniformTypeIdentifiers
 import AppKit
 #endif
 
+// MARK: - M3U Document for fileExporter
+
+struct M3UDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.plainText] }
+
+    var text: String
+
+    init(text: String) {
+        self.text = text
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        if let data = configuration.file.regularFileContents {
+            text = String(data: data, encoding: .utf8) ?? ""
+        } else {
+            text = ""
+        }
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: text.data(using: .utf8) ?? Data())
+    }
+}
+
 struct PlaylistTransferToMusicSheet: View {
     let playlist: SavedPlaylist
 
@@ -30,9 +54,12 @@ struct PlaylistTransferToMusicSheet: View {
     @State private var overrides: [UUID: Track] = [:]
     @State private var errorMessage: String?
     @State private var exportedCount: Int = 0
+    @State private var m3uText: String = ""
     @State private var m3uURL: URL?
     @State private var savedToDownloads: Bool = false
     @State private var copiedLink: Bool = false
+    @State private var openInMusicAfterSave: Bool = false
+    @State private var showFileExporter: Bool = false
 
     // Song picker state
     @State private var pickerTargetResultID: UUID?
@@ -78,6 +105,33 @@ struct PlaylistTransferToMusicSheet: View {
         .frame(minWidth: 500, minHeight: 450)
         .task {
             await runMatching()
+        }
+        .fileExporter(
+            isPresented: $showFileExporter,
+            document: M3UDocument(text: m3uText),
+            contentType: .plainText,
+            defaultFilename: "\(sanitizedFilename()) (GrooveWire).m3u"
+        ) { result in
+            switch result {
+            case .success(let url):
+                savedToDownloads = true
+                #if os(macOS)
+                if openInMusicAfterSave {
+                    let musicAppURL = URL(fileURLWithPath: "/System/Applications/Music.app")
+                    NSWorkspace.shared.open(
+                        [url],
+                        withApplicationAt: musicAppURL,
+                        configuration: NSWorkspace.OpenConfiguration()
+                    )
+                }
+                #endif
+                openInMusicAfterSave = false
+                phase = .complete
+            case .failure(let error):
+                errorMessage = error.localizedDescription
+                openInMusicAfterSave = false
+                phase = .failed
+            }
         }
     }
 
@@ -176,28 +230,26 @@ struct PlaylistTransferToMusicSheet: View {
 
             Divider()
 
-            // Option 1: Open in Music
-            #if os(macOS)
+            // Option 1: Save & Open in Music
             Button {
-                saveToDownloadsAndOpenInMusic()
+                openInMusicAfterSave = true
+                showFileExporter = true
             } label: {
                 Label("Save & Open in Music", systemImage: "music.note")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .tint(themeColor)
-            #endif
 
-            // Option 2: Save to file (NSSavePanel)
-            #if os(macOS)
+            // Option 2: Save to file only
             Button {
-                saveToFile()
+                openInMusicAfterSave = false
+                showFileExporter = true
             } label: {
                 Label("Save M3U to...", systemImage: "folder")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
-            #endif
 
             // Option 3: Share
             if let m3uURL {
@@ -264,7 +316,7 @@ struct PlaylistTransferToMusicSheet: View {
                 .foregroundStyle(.secondary)
 
             if savedToDownloads {
-                Label("M3U saved to Downloads", systemImage: "folder")
+                Label("M3U saved", systemImage: "folder")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -497,6 +549,13 @@ struct PlaylistTransferToMusicSheet: View {
         return parts.joined(separator: ", ")
     }
 
+    private func sanitizedFilename() -> String {
+        playlist.name
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .replacingOccurrences(of: "\\", with: "-")
+    }
+
     // MARK: - Actions
 
     private func runMatching() async {
@@ -559,7 +618,9 @@ struct PlaylistTransferToMusicSheet: View {
         }
 
         exportedCount = count
+        m3uText = m3u
 
+        // Also write temp file for ShareLink
         let filename = sanitizedFilename()
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(filename).m3u")
         try? m3u.write(to: tempURL, atomically: true, encoding: .utf8)
@@ -567,13 +628,6 @@ struct PlaylistTransferToMusicSheet: View {
 
         // Update track models with Apple Music IDs
         updateTrackModels()
-    }
-
-    private func sanitizedFilename() -> String {
-        playlist.name
-            .replacingOccurrences(of: "/", with: "-")
-            .replacingOccurrences(of: ":", with: "-")
-            .replacingOccurrences(of: "\\", with: "-")
     }
 
     private func updateTrackModels() {
@@ -588,54 +642,4 @@ struct PlaylistTransferToMusicSheet: View {
         }
         try? modelContext.save()
     }
-
-    #if os(macOS)
-    /// Save M3U via NSSavePanel and open in Music.app
-    private func saveToDownloadsAndOpenInMusic() {
-        guard let savedURL = saveViaPanel() else { return }
-
-        // Open in Music.app
-        let musicAppURL = URL(fileURLWithPath: "/System/Applications/Music.app")
-        NSWorkspace.shared.open(
-            [savedURL],
-            withApplicationAt: musicAppURL,
-            configuration: NSWorkspace.OpenConfiguration()
-        )
-
-        savedToDownloads = true
-        phase = .complete
-    }
-
-    /// Save M3U via NSSavePanel only (no auto-open)
-    private func saveToFile() {
-        guard saveViaPanel() != nil else { return }
-        savedToDownloads = true
-    }
-
-    /// Shared NSSavePanel logic — returns saved URL or nil if cancelled
-    @discardableResult
-    private func saveViaPanel() -> URL? {
-        guard let sourceURL = m3uURL else { return nil }
-        let filename = "\(sanitizedFilename()) (GrooveWire).m3u"
-
-        let panel = NSSavePanel()
-        panel.title = "Save Playlist"
-        panel.nameFieldStringValue = filename
-        panel.allowedContentTypes = [.plainText]
-        panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-
-        let response = panel.runModal()
-        guard response == .OK, let destURL = panel.url else { return nil }
-
-        do {
-            let data = try Data(contentsOf: sourceURL)
-            try data.write(to: destURL)
-            return destURL
-        } catch {
-            errorMessage = error.localizedDescription
-            phase = .failed
-            return nil
-        }
-    }
-    #endif
 }
