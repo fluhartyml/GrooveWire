@@ -74,6 +74,17 @@ struct LibraryListView: View {
                                       systemImage: playlist.isPublic ? "lock.fill" : "globe")
                             }
 
+                            if playlist.trackList.contains(where: { $0.spotifyID != nil }) && spotifyService.isConnected {
+                                Button {
+                                    let tracks = playlist.trackList.sorted { ($0.sortOrder) < ($1.sortOrder) }
+                                    if let first = tracks.first {
+                                        playbackManager.play(track: first, from: tracks)
+                                    }
+                                } label: {
+                                    Label("Spotify Queue", systemImage: "hifispeaker.fill")
+                                }
+                            }
+
                             Button {
                                 sharePlaylist = playlist
                             } label: {

@@ -434,7 +434,7 @@ final class SpotifyService: StreamingServiceProtocol {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let body: [String: Any] = ["device_ids": [deviceID], "play": false]
+        let body: [String: Any] = ["device_ids": [deviceID], "play": true]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (_, response) = try await URLSession.shared.data(for: request)
