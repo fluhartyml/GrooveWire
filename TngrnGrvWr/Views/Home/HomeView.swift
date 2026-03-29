@@ -92,14 +92,16 @@ struct HomeView: View {
                             name: "Spotify",
                             icon: "dot.radiowaves.left.and.right",
                             connected: spotifyService.isConnected,
-                            color: .green
+                            color: .green,
+                            onDisconnect: { spotifyService.disconnect() }
                         )
                         Divider()
                         serviceRow(
                             name: "Apple Music",
                             icon: "apple.logo",
                             connected: appleMusicService.isConnected,
-                            color: .mint
+                            color: .mint,
+                            onDisconnect: { appleMusicService.disconnect() }
                         )
                     }
                 }
@@ -152,7 +154,7 @@ struct HomeView: View {
 
     // MARK: - Helpers
 
-    private func serviceRow(name: String, icon: String, connected: Bool, color: Color) -> some View {
+    private func serviceRow(name: String, icon: String, connected: Bool, color: Color, onDisconnect: @escaping () -> Void) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .foregroundStyle(connected ? color : .secondary)
@@ -164,6 +166,14 @@ struct HomeView: View {
                 Text("Connected")
                     .font(.caption)
                     .foregroundStyle(color)
+                Button {
+                    onDisconnect()
+                } label: {
+                    Image(systemName: "circle.slash")
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
+                .help("Disconnect")
             } else {
                 Text("Not Connected")
                     .font(.caption)
