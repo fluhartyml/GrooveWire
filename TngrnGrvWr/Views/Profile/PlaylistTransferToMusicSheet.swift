@@ -32,6 +32,7 @@ struct PlaylistTransferToMusicSheet: View {
     @State private var exportedCount: Int = 0
     @State private var m3uURL: URL?
     @State private var savedToDownloads: Bool = false
+    @State private var copiedLink: Bool = false
 
     // Song picker state
     @State private var pickerTargetResultID: UUID?
@@ -220,11 +221,14 @@ struct PlaylistTransferToMusicSheet: View {
                     #else
                     UIPasteboard.general.string = link
                     #endif
+                    copiedLink = true
                 } label: {
-                    Label("Copy Spotify Link", systemImage: "doc.on.doc")
+                    Label(copiedLink ? "Copied!" : "Copy Spotify Link",
+                          systemImage: copiedLink ? "checkmark" : "doc.on.doc")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
+                .tint(copiedLink ? .green : nil)
             }
 
             // Back to review

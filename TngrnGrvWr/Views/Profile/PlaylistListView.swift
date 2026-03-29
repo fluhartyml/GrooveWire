@@ -908,6 +908,7 @@ struct M3UExportSheet: View {
     @State private var isMatching = false
     @State private var matchedCount = 0
     @State private var m3uURL: URL?
+    @State private var copiedLink = false
 
     private var needsMatching: Bool {
         appleMusicService.isConnected &&
@@ -978,12 +979,14 @@ struct M3UExportSheet: View {
                         #else
                         UIPasteboard.general.string = link
                         #endif
-                        dismiss()
+                        copiedLink = true
                     } label: {
-                        Label("Copy Spotify Link", systemImage: "doc.on.doc")
+                        Label(copiedLink ? "Copied!" : "Copy Spotify Link",
+                              systemImage: copiedLink ? "checkmark" : "doc.on.doc")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
+                    .tint(copiedLink ? .green : nil)
                 }
 
                 Spacer()
