@@ -92,7 +92,7 @@ struct PlaylistListView: View {
                                 Button {
                                     musicTransferTarget = playlist
                                 } label: {
-                                    Label("Transfer to Apple Music", systemImage: "apple.logo")
+                                    Label("Transfer Playlist", systemImage: "apple.logo")
                                 }
                             }
                             #endif
@@ -101,12 +101,6 @@ struct PlaylistListView: View {
                                 transferTarget = playlist
                             } label: {
                                 Label("Transfer to Other Service", systemImage: "arrow.triangle.2.circlepath")
-                            }
-
-                            Button {
-                                exportPlaylist = playlist
-                            } label: {
-                                Label("Export Playlist", systemImage: "square.and.arrow.up")
                             }
 
                             Divider()

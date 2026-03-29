@@ -6,30 +6,6 @@ import UniformTypeIdentifiers
 import AppKit
 #endif
 
-// MARK: - M3U Document for fileExporter
-
-struct M3UDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.plainText] }
-
-    var text: String
-
-    init(text: String) {
-        self.text = text
-    }
-
-    init(configuration: ReadConfiguration) throws {
-        if let data = configuration.file.regularFileContents {
-            text = String(data: data, encoding: .utf8) ?? ""
-        } else {
-            text = ""
-        }
-    }
-
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: text.data(using: .utf8) ?? Data())
-    }
-}
-
 struct PlaylistTransferToMusicSheet: View {
     let playlist: SavedPlaylist
 
@@ -54,12 +30,9 @@ struct PlaylistTransferToMusicSheet: View {
     @State private var overrides: [UUID: Track] = [:]
     @State private var errorMessage: String?
     @State private var exportedCount: Int = 0
-    @State private var m3uText: String = ""
     @State private var m3uURL: URL?
     @State private var savedToDownloads: Bool = false
     @State private var copiedLink: Bool = false
-    @State private var openInMusicAfterSave: Bool = false
-    @State private var showFileExporter: Bool = false
 
     // Song picker state
     @State private var pickerTargetResultID: UUID?
@@ -95,7 +68,7 @@ struct PlaylistTransferToMusicSheet: View {
                     failedView
                 }
             }
-            .navigationTitle("Transfer to Apple Music")
+            .navigationTitle("Transfer Playlist")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(phase == .complete ? "Done" : "Cancel") { dismiss() }
@@ -105,33 +78,6 @@ struct PlaylistTransferToMusicSheet: View {
         .frame(minWidth: 500, minHeight: 450)
         .task {
             await runMatching()
-        }
-        .fileExporter(
-            isPresented: $showFileExporter,
-            document: M3UDocument(text: m3uText),
-            contentType: .plainText,
-            defaultFilename: "\(sanitizedFilename()) (GrooveWire).m3u"
-        ) { result in
-            switch result {
-            case .success(let url):
-                savedToDownloads = true
-                #if os(macOS)
-                if openInMusicAfterSave {
-                    let musicAppURL = URL(fileURLWithPath: "/System/Applications/Music.app")
-                    NSWorkspace.shared.open(
-                        [url],
-                        withApplicationAt: musicAppURL,
-                        configuration: NSWorkspace.OpenConfiguration()
-                    )
-                }
-                #endif
-                openInMusicAfterSave = false
-                phase = .complete
-            case .failure(let error):
-                errorMessage = error.localizedDescription
-                openInMusicAfterSave = false
-                phase = .failed
-            }
         }
     }
 
@@ -230,26 +176,32 @@ struct PlaylistTransferToMusicSheet: View {
 
             Divider()
 
-            // Option 1: Save & Open in Music
-            Button {
-                openInMusicAfterSave = true
-                showFileExporter = true
-            } label: {
-                Label("Save & Open in Music", systemImage: "music.note")
-                    .frame(maxWidth: .infinity)
+            // Option 1: Open in Music
+            #if os(macOS)
+            if let m3uURL {
+                Button {
+                    let musicAppURL = URL(fileURLWithPath: "/System/Applications/Music.app")
+                    NSWorkspace.shared.open([m3uURL], withApplicationAt: musicAppURL, configuration: NSWorkspace.OpenConfiguration())
+                    phase = .complete
+                } label: {
+                    Label("Open in Music", systemImage: "music.note")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(themeColor)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(themeColor)
+            #endif
 
-            // Option 2: Save to file only
+            // Option 2: Save M3U to Downloads
             Button {
-                openInMusicAfterSave = false
-                showFileExporter = true
+                saveToDownloads()
             } label: {
-                Label("Save M3U to...", systemImage: "folder")
+                Label(savedToDownloads ? "Saved to Downloads!" : "Save M3U to Downloads",
+                      systemImage: savedToDownloads ? "checkmark" : "folder")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
+            .tint(savedToDownloads ? .green : nil)
 
             // Option 3: Share
             if let m3uURL {
@@ -595,6 +547,7 @@ struct PlaylistTransferToMusicSheet: View {
     /// Build the M3U string and write to a temp file for sharing
     private func generateM3U() {
         var m3u = "#EXTM3U\n"
+        m3u += "#PLAYLIST:\(playlist.name)\n"
         var count = 0
 
         for result in matchResults where selectedResultIDs.contains(result.id) {
@@ -618,10 +571,9 @@ struct PlaylistTransferToMusicSheet: View {
         }
 
         exportedCount = count
-        m3uText = m3u
 
-        // Also write temp file for ShareLink
-        let filename = sanitizedFilename()
+        // Write temp file for ShareLink / Open in Music
+        let filename = "\(sanitizedFilename()) (GrooveWire)"
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(filename).m3u")
         try? m3u.write(to: tempURL, atomically: true, encoding: .utf8)
         m3uURL = tempURL
@@ -641,5 +593,24 @@ struct PlaylistTransferToMusicSheet: View {
             }
         }
         try? modelContext.save()
+    }
+
+    private func saveToDownloads() {
+        guard let sourceURL = m3uURL else { return }
+        let filename = "\(sanitizedFilename()) (GrooveWire).m3u"
+
+        do {
+            let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+            let destURL = downloadsURL.appendingPathComponent(filename)
+
+            if FileManager.default.fileExists(atPath: destURL.path) {
+                try FileManager.default.removeItem(at: destURL)
+            }
+            try FileManager.default.copyItem(at: sourceURL, to: destURL)
+            savedToDownloads = true
+        } catch {
+            errorMessage = error.localizedDescription
+            phase = .failed
+        }
     }
 }
