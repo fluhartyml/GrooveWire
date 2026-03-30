@@ -151,9 +151,9 @@ final class TrackMatchingService {
             results.append(result)
             matchProgress = Double(index + 1) / Double(tracks.count)
 
-            // Small delay between requests to avoid rate limiting
+            // Delay between requests to avoid Spotify rate limiting
             if index < tracks.count - 1 {
-                try? await Task.sleep(for: .milliseconds(200))
+                try? await Task.sleep(for: .milliseconds(500))
             }
         }
 

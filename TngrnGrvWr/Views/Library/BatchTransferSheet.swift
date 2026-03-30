@@ -193,6 +193,11 @@ struct BatchTransferSheet: View {
                 } catch {
                     await MainActor.run { failedNames.append(playlist.name) }
                 }
+
+                // Buffer between playlists to avoid Spotify rate limiting
+                if index < playlists.count - 1 {
+                    try? await Task.sleep(for: .seconds(3))
+                }
             }
 
             await MainActor.run {

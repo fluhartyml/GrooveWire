@@ -325,32 +325,52 @@ final class SpotifyService: StreamingServiceProtocol {
     }
 
     func search(query: String, offset: Int) async throws -> [Track] {
-        let token = try await authManager.validToken()
-        var components = URLComponents(string: "\(baseURL)/search")!
-        var queryItems = [
-            URLQueryItem(name: "q", value: query),
-            URLQueryItem(name: "type", value: "track"),
-            URLQueryItem(name: "limit", value: "10")
-        ]
-        if offset > 0 {
-            queryItems.append(URLQueryItem(name: "offset", value: "\(offset)"))
-        }
-        components.queryItems = queryItems
-        let url = components.url!
-        print("🔍 [SpotifyService] Request URL: \(url.absoluteString)")
+        var retryDelay: UInt64 = 2_000_000_000 // 2 seconds
+        let maxRetries = 3
 
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        print("🔍 [SpotifyService] Token prefix: \(String(token.prefix(10)))...")
+        for attempt in 0...maxRetries {
+            let token = try await authManager.validToken()
+            var components = URLComponents(string: "\(baseURL)/search")!
+            var queryItems = [
+                URLQueryItem(name: "q", value: query),
+                URLQueryItem(name: "type", value: "track"),
+                URLQueryItem(name: "limit", value: "10")
+            ]
+            if offset > 0 {
+                queryItems.append(URLQueryItem(name: "offset", value: "\(offset)"))
+            }
+            components.queryItems = queryItems
+            let url = components.url!
+            print("🔍 [SpotifyService] Request URL: \(url.absoluteString)")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        if let http = response as? HTTPURLResponse {
-            print("🔍 [SpotifyService] Search HTTP \(http.statusCode)")
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            print("🔍 [SpotifyService] Token prefix: \(String(token.prefix(10)))...")
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse {
+                print("🔍 [SpotifyService] Search HTTP \(http.statusCode)")
+
+                if http.statusCode == 429 {
+                    if attempt < maxRetries {
+                        let retryAfter = http.value(forHTTPHeaderField: "Retry-After")
+                            .flatMap { UInt64($0) }
+                        let waitSeconds = retryAfter ?? (retryDelay / 1_000_000_000)
+                        print("🔍 [SpotifyService] Rate limited — waiting \(waitSeconds)s before retry \(attempt + 1)/\(maxRetries)")
+                        try await Task.sleep(nanoseconds: waitSeconds * 1_000_000_000)
+                        retryDelay *= 2
+                        continue
+                    }
+                    throw SpotifyError.rateLimited
+                }
+            }
+            if let raw = String(data: data, encoding: .utf8) {
+                print("🔍 [SpotifyService] Response (first 500): \(String(raw.prefix(500)))")
+            }
+            return try parseSearchResults(data)
         }
-        if let raw = String(data: data, encoding: .utf8) {
-            print("🔍 [SpotifyService] Response (first 500): \(String(raw.prefix(500)))")
-        }
-        return try parseSearchResults(data)
+
+        throw SpotifyError.rateLimited
     }
 
     // MARK: - Playback
