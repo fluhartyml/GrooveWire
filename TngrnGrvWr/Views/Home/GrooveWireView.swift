@@ -67,7 +67,7 @@ struct GrooveWireView: View {
                                     .foregroundStyle(themeColor)
                                     .frame(width: 20)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Import Playlist")
+                                    Text("Import Playlists or Songs")
                                         .font(.subheadline.weight(.medium))
                                     Text("Paste a Spotify link, import CSV/M3U, or browse Apple Music")
                                         .font(.caption2)

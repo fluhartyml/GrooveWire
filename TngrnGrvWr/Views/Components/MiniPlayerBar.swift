@@ -24,22 +24,8 @@ struct MiniPlayerBar: View {
                         artworkPlaceholder
                     }
 
-                    // Track info
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(track.title)
-                            .font(.subheadline.weight(.medium))
-                            .lineLimit(1)
-                        Text(track.artist)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                        if let next = playbackManager.nextTrack {
-                            Text("Next: \(next.title) — \(next.artist)")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                                .lineLimit(1)
-                        }
-                    }
+                    // LCD Display
+                    lcdDisplay(track: track)
 
                     Spacer()
 
@@ -73,6 +59,72 @@ struct MiniPlayerBar: View {
                 .background(.ultraThinMaterial)
             }
         }
+    }
+
+    // MARK: - LCD Display
+
+    @ViewBuilder
+    private func lcdDisplay(track: Track) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            // Line 1: Track title
+            Text(track.title)
+                .font(.system(.caption, design: .monospaced, weight: .medium))
+                .lineLimit(1)
+
+            // Line 2: Artist
+            Text(track.artist)
+                .font(.system(.caption2, design: .monospaced))
+                .lineLimit(1)
+
+            // Line 3: Status line — skip message, service icon, or next track
+            if let skipped = playbackManager.skippedMessage {
+                HStack(spacing: 4) {
+                    Image(systemName: "forward.fill")
+                        .font(.system(size: 7))
+                    Text(skipped)
+                        .font(.system(.caption2, design: .monospaced))
+                }
+                .foregroundStyle(.orange)
+                .lineLimit(1)
+            } else {
+                HStack(spacing: 4) {
+                    // Service indicator
+                    if track.spotifyID != nil && track.appleMusicID != nil {
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .font(.system(size: 7))
+                            .foregroundStyle(.green)
+                        Image(systemName: "apple.logo")
+                            .font(.system(size: 7))
+                            .foregroundStyle(.gray)
+                    } else if track.spotifyID != nil {
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .font(.system(size: 7))
+                            .foregroundStyle(.green)
+                    } else if track.appleMusicID != nil {
+                        Image(systemName: "apple.logo")
+                            .font(.system(size: 7))
+                            .foregroundStyle(.gray)
+                    }
+
+                    if let next = playbackManager.nextTrack {
+                        Text("\(next.title) — \(next.artist)")
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.black.opacity(0.3))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .strokeBorder(Color.gray.opacity(0.3), lineWidth: 0.5)
+        )
     }
 
     // MARK: - Audio Output

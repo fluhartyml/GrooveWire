@@ -1,5 +1,9 @@
 import Foundation
 
+enum SpotifySkipError: Error {
+    case noSpotifyID(String)
+}
+
 @Observable
 final class SpotifyService: StreamingServiceProtocol {
     let authManager: SpotifyAuthManager
@@ -354,7 +358,7 @@ final class SpotifyService: StreamingServiceProtocol {
     func play(track: Track) async throws {
         guard let spotifyID = track.spotifyID else {
             print("[Spotify] Track '\(track.title)' has no Spotify ID — skipping")
-            return
+            throw SpotifySkipError.noSpotifyID(track.title)
         }
 
         // Auto-fetch devices if none selected

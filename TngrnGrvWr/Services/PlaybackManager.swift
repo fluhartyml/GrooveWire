@@ -8,6 +8,7 @@ final class PlaybackManager {
     var isPlaying = false
     var queue: [Track] = []
     var currentIndex = 0
+    var skippedMessage: String?
 
     private let spotifyService: SpotifyService
     private let appleMusicService: AppleMusicService
@@ -34,21 +35,7 @@ final class PlaybackManager {
         startPolling()
 
         Task {
-            do {
-                if let service = activeService {
-                    print("[PlaybackManager] Playing '\(track.title)' via \(service is SpotifyService ? "Spotify" : "Apple Music")")
-                    try await service.play(track: track)
-                    print("[PlaybackManager] Play command sent successfully")
-                } else {
-                    print("[PlaybackManager] No active service — cannot play")
-                    isPlaying = false
-                    stopPolling()
-                }
-            } catch {
-                print("[PlaybackManager] Play failed: \(error.localizedDescription)")
-                isPlaying = false
-                stopPolling()
-            }
+            await playCurrentTrack()
         }
     }
 
@@ -128,6 +115,48 @@ final class PlaybackManager {
 
     var canSkipBackward: Bool {
         !queue.isEmpty && currentIndex > 0
+    }
+
+    // MARK: - Play with Skip Handling
+
+    private func playCurrentTrack() async {
+        guard let track = currentTrack, let service = activeService else {
+            print("[PlaybackManager] No active service — cannot play")
+            isPlaying = false
+            stopPolling()
+            return
+        }
+
+        do {
+            print("[PlaybackManager] Playing '\(track.title)' via \(service is SpotifyService ? "Spotify" : "Apple Music")")
+            try await service.play(track: track)
+            print("[PlaybackManager] Play command sent successfully")
+            skippedMessage = nil
+        } catch is SpotifySkipError {
+            // Show skip message and auto-advance
+            skippedMessage = "Apple Music only, skipped"
+            print("[PlaybackManager] Skipped '\(track.title)' — no Spotify ID")
+
+            // Clear message after 2 seconds
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                if skippedMessage != nil { skippedMessage = nil }
+            }
+
+            // Auto-advance to next track
+            if canSkipForward {
+                currentIndex += 1
+                currentTrack = queue[currentIndex]
+                await playCurrentTrack()
+            } else {
+                isPlaying = false
+                stopPolling()
+            }
+        } catch {
+            print("[PlaybackManager] Play failed: \(error.localizedDescription)")
+            isPlaying = false
+            stopPolling()
+        }
     }
 
     // MARK: - Auto-Advance Polling

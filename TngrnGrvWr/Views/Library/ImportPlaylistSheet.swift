@@ -328,7 +328,7 @@ struct ImportPlaylistSheet: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("Import Playlist")
+            .navigationTitle("Import Playlists or Songs")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -536,8 +536,12 @@ struct ImportPlaylistSheet: View {
 
         do {
             try modelContext.save()
+            let trackCount = addedTracks.count
             isLoading = false
-            successMessage = "Created \"\(trimmedName)\" — \(addedTracks.count) tracks"
+            songSearchResults = []
+            addedTracks = []
+            songSearchText = ""
+            successMessage = "Created \"\(trimmedName)\" — \(trackCount) tracks"
             try? await Task.sleep(for: .seconds(1.5))
             dismiss()
         } catch {
