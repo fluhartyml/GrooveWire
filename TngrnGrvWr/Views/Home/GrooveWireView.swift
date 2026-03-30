@@ -63,7 +63,7 @@ struct GrooveWireView: View {
                             showImportPlaylist = true
                         } label: {
                             HStack(spacing: 10) {
-                                Image(systemName: "arrow.triangle.2.circlepath")
+                                Image(systemName: "square.and.arrow.down")
                                     .foregroundStyle(themeColor)
                                     .frame(width: 20)
                                 VStack(alignment: .leading, spacing: 2) {

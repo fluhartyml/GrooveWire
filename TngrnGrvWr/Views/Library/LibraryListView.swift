@@ -11,7 +11,9 @@ struct LibraryListView: View {
     @State private var selectedPlaylist: SavedPlaylist?
     @State private var showAddPlaylist = false
     @State private var transferTarget: SavedPlaylist?
-    @State private var musicTransferTarget: SavedPlaylist?
+    @State private var transferPlaylists: [SavedPlaylist]?
+    @State private var selectedForTransfer: Set<PersistentIdentifier> = []
+    @State private var isSelectMode = false
     @State private var exportPlaylist: SavedPlaylist?
     @State private var searchTargetPlaylist: SavedPlaylist?
     @State private var sharePlaylist: SavedPlaylist?
@@ -51,14 +53,7 @@ struct LibraryListView: View {
                     }
 
                     ForEach(savedPlaylists) { playlist in
-                        playlistButton(
-                            name: playlist.name,
-                            icon: playlist.isPublic ? "globe" : "lock.fill",
-                            count: playlist.trackCount,
-                            isSelected: selectedPlaylist?.id == playlist.id
-                        ) {
-                            selectedPlaylist = playlist
-                        }
+                        playlistRow(playlist)
                         .contextMenu {
                             Button {
                                 searchTargetPlaylist = playlist
@@ -91,20 +86,10 @@ struct LibraryListView: View {
                                 Label("Share Playlist", systemImage: "square.and.arrow.up")
                             }
 
-                            #if os(macOS)
-                            if playlist.trackList.contains(where: { $0.spotifyID != nil }) && appleMusicService.isConnected {
-                                Button {
-                                    musicTransferTarget = playlist
-                                } label: {
-                                    Label("Transfer to Apple Music", systemImage: "apple.logo")
-                                }
-                            }
-                            #endif
-
                             Button {
                                 transferTarget = playlist
                             } label: {
-                                Label("Transfer to Other Service", systemImage: "arrow.triangle.2.circlepath")
+                                Label("Transfer to Streaming Service", systemImage: "arrow.triangle.swap")
                             }
 
                             Button {
@@ -196,6 +181,36 @@ struct LibraryListView: View {
                         .help("Sync from Spotify")
                     }
 
+                    if isSelectMode {
+                        Button {
+                            let playlists = savedPlaylists.filter { selectedForTransfer.contains($0.persistentModelID) }
+                            if !playlists.isEmpty {
+                                transferPlaylists = playlists
+                            }
+                            isSelectMode = false
+                            selectedForTransfer = []
+                        } label: {
+                            Text("Transfer (\(selectedForTransfer.count))")
+                                .font(.caption)
+                        }
+                        .disabled(selectedForTransfer.isEmpty)
+
+                        Button {
+                            isSelectMode = false
+                            selectedForTransfer = []
+                        } label: {
+                            Text("Cancel")
+                                .font(.caption)
+                        }
+                    } else {
+                        Button {
+                            isSelectMode = true
+                        } label: {
+                            Image(systemName: "arrow.triangle.swap")
+                        }
+                        .help("Select playlists to transfer")
+                    }
+
                     Button {
                         showAddPlaylist = true
                     } label: {
@@ -221,8 +236,13 @@ struct LibraryListView: View {
         .sheet(item: $transferTarget) { playlist in
             PlaylistTransferSheet(playlist: playlist)
         }
-        .sheet(item: $musicTransferTarget) { playlist in
-            PlaylistTransferToMusicSheet(playlist: playlist)
+        .sheet(isPresented: Binding(
+            get: { transferPlaylists != nil },
+            set: { if !$0 { transferPlaylists = nil } }
+        )) {
+            if let playlists = transferPlaylists {
+                BatchTransferSheet(playlists: playlists)
+            }
         }
         .sheet(item: $exportPlaylist) { playlist in
             M3UExportSheet(playlist: playlist)
@@ -233,6 +253,46 @@ struct LibraryListView: View {
     }
 
     // MARK: - Playlist Row
+
+    @ViewBuilder
+    private func playlistRow(_ playlist: SavedPlaylist) -> some View {
+        if isSelectMode {
+            selectModeRow(playlist)
+        } else {
+            playlistButton(
+                name: playlist.name,
+                icon: playlist.isPublic ? "globe" : "lock.fill",
+                count: playlist.trackCount,
+                isSelected: selectedPlaylist?.id == playlist.id
+            ) {
+                selectedPlaylist = playlist
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func selectModeRow(_ playlist: SavedPlaylist) -> some View {
+        let isChecked = selectedForTransfer.contains(playlist.persistentModelID)
+        Button {
+            if isChecked {
+                selectedForTransfer.remove(playlist.persistentModelID)
+            } else {
+                selectedForTransfer.insert(playlist.persistentModelID)
+            }
+        } label: {
+            HStack {
+                Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isChecked ? themeColor : .secondary)
+                Text(playlist.name)
+                    .font(.subheadline)
+                Spacer()
+                Text("\(playlist.trackCount)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .buttonStyle(.plain)
+    }
 
     @ViewBuilder
     private func playlistButton(name: String, icon: String, count: Int?, isSelected: Bool, action: @escaping () -> Void) -> some View {
