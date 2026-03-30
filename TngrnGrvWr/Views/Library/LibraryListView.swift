@@ -206,7 +206,7 @@ struct LibraryListView: View {
                         Button {
                             isSelectMode = true
                         } label: {
-                            Image(systemName: "arrow.triangle.swap")
+                            Image(systemName: "checklist")
                         }
                         .help("Select playlists to transfer")
                     }
