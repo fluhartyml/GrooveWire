@@ -139,10 +139,9 @@ struct ImportPlaylistSheet: View {
                         Section("Results (\(songSearchResults.count))") {
                             ForEach(songSearchResults) { track in
                                 Button {
-                                    if !addedTracks.contains(where: { $0.title == track.title && $0.artist == track.artist }) {
+                                    let alreadyAdded = addedTracks.contains(where: { $0.title == track.title && $0.artist == track.artist })
+                                    if !alreadyAdded {
                                         addedTracks.append(track)
-                                        songSearchText = ""
-                                        songSearchResults = []
                                     }
                                 } label: {
                                     HStack {
@@ -162,8 +161,13 @@ struct ImportPlaylistSheet: View {
                                             Text(track.artist).font(.caption).foregroundStyle(.secondary)
                                         }
                                         Spacer()
-                                        Image(systemName: "plus.circle.fill")
-                                            .foregroundStyle(themeColor)
+                                        if addedTracks.contains(where: { $0.title == track.title && $0.artist == track.artist }) {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundStyle(.green)
+                                        } else {
+                                            Image(systemName: "plus.circle.fill")
+                                                .foregroundStyle(themeColor)
+                                        }
                                     }
                                 }
                                 .buttonStyle(.plain)
