@@ -1,5 +1,9 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let switchToLibraryTab = Notification.Name("switchToLibraryTab")
+}
+
 struct MainTabView: View {
     @State private var selectedTab = "home"
 
@@ -26,6 +30,9 @@ struct MainTabView: View {
             }
 
             MiniPlayerBar()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .switchToLibraryTab)) { _ in
+            selectedTab = "library"
         }
     }
 }

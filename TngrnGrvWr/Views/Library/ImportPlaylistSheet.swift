@@ -40,7 +40,7 @@ struct ImportPlaylistSheet: View {
 
     // Apple Music mode
     @State private var appleMusicPlaylists: [AppleMusicPlaylist] = []
-    @State private var selectedAppleMusicPlaylist: AppleMusicPlaylist?
+    @State private var selectedAppleMusicPlaylists: Set<String> = []
     @State private var isLoadingAppleMusicPlaylists = false
 
     @State private var isLoading = false
@@ -272,10 +272,14 @@ struct ImportPlaylistSheet: View {
                                 .foregroundStyle(.secondary)
                         }
                     } else {
-                        Section("Select a Playlist") {
+                        Section("Select Playlists") {
                             ForEach(appleMusicPlaylists) { playlist in
                                 Button {
-                                    selectedAppleMusicPlaylist = playlist
+                                    if selectedAppleMusicPlaylists.contains(playlist.id) {
+                                        selectedAppleMusicPlaylists.remove(playlist.id)
+                                    } else {
+                                        selectedAppleMusicPlaylists.insert(playlist.id)
+                                    }
                                 } label: {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 2) {
@@ -287,7 +291,7 @@ struct ImportPlaylistSheet: View {
                                                 .foregroundStyle(.secondary)
                                         }
                                         Spacer()
-                                        if selectedAppleMusicPlaylist?.id == playlist.id {
+                                        if selectedAppleMusicPlaylists.contains(playlist.id) {
                                             Image(systemName: "checkmark.circle.fill")
                                                 .foregroundStyle(themeColor)
                                         }
@@ -392,7 +396,7 @@ struct ImportPlaylistSheet: View {
                 || fileContents.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 || isLoading
         case .appleMusic:
-            return selectedAppleMusicPlaylist == nil || isLoading
+            return selectedAppleMusicPlaylists.isEmpty || isLoading
         }
     }
 
@@ -410,44 +414,56 @@ struct ImportPlaylistSheet: View {
     }
 
     private func importFromAppleMusic() async {
-        guard let selected = selectedAppleMusicPlaylist else { return }
+        let selected = appleMusicPlaylists.filter { selectedAppleMusicPlaylists.contains($0.id) }
+        guard !selected.isEmpty else { return }
 
         isLoading = true
         errorMessage = nil
-        statusMessage = "Fetching tracks from \(selected.name)..."
+        var totalTracks = 0
 
         do {
-            let tracks = try await appleMusicService.fetchPlaylistTracks(playlistID: selected.id)
+            for playlist in selected {
+                statusMessage = "Fetching tracks from \(playlist.name)..."
 
-            guard !tracks.isEmpty else {
-                errorMessage = "No tracks found in this playlist."
-                isLoading = false
-                return
-            }
+                let tracks = try await appleMusicService.fetchPlaylistTracks(playlistID: playlist.id)
+                guard !tracks.isEmpty else { continue }
 
-            let savedPlaylist = SavedPlaylist(
-                name: selected.name,
-                appleMusicPlaylistID: selected.id,
-                playlistDescription: selected.description,
-                isPublic: false
-            )
-            modelContext.insert(savedPlaylist)
-
-            for track in tracks {
-                let localTrack = Track(
-                    title: track.title,
-                    artist: track.artist,
-                    albumTitle: track.albumTitle,
-                    artworkURL: track.artworkURL,
-                    appleMusicID: track.appleMusicID,
-                    durationSeconds: track.durationSeconds
+                let savedPlaylist = SavedPlaylist(
+                    name: playlist.name,
+                    appleMusicPlaylistID: playlist.id,
+                    playlistDescription: playlist.description,
+                    isPublic: false
                 )
-                localTrack.savedPlaylist = savedPlaylist
-                modelContext.insert(localTrack)
-                savedPlaylist.trackList.append(localTrack)
+                modelContext.insert(savedPlaylist)
+
+                for track in tracks {
+                    let localTrack = Track(
+                        title: track.title,
+                        artist: track.artist,
+                        albumTitle: track.albumTitle,
+                        artworkURL: track.artworkURL,
+                        appleMusicID: track.appleMusicID,
+                        durationSeconds: track.durationSeconds
+                    )
+                    localTrack.savedPlaylist = savedPlaylist
+                    modelContext.insert(localTrack)
+                    savedPlaylist.trackList.append(localTrack)
+                }
+                totalTracks += tracks.count
             }
 
             try modelContext.save()
+            isLoading = false
+            appleMusicPlaylists = []
+            selectedAppleMusicPlaylists = []
+            statusMessage = ""
+            if selected.count == 1 {
+                successMessage = "Imported \"\(selected[0].name)\" — \(totalTracks) tracks"
+            } else {
+                successMessage = "Imported \(selected.count) playlists — \(totalTracks) tracks"
+            }
+            try? await Task.sleep(for: .seconds(1.5))
+            NotificationCenter.default.post(name: .switchToLibraryTab, object: nil)
             dismiss()
         } catch {
             errorMessage = "Failed to import: \(error.localizedDescription)"
@@ -497,8 +513,10 @@ struct ImportPlaylistSheet: View {
 
             try modelContext.save()
             isLoading = false
+            linkText = ""
             successMessage = "Imported \"\(playlistName)\" — \(tracks.count) tracks"
             try? await Task.sleep(for: .seconds(1.5))
+            NotificationCenter.default.post(name: .switchToLibraryTab, object: nil)
             dismiss()
         } catch {
             errorMessage = "Failed to fetch playlist: \(error.localizedDescription)"
@@ -543,6 +561,7 @@ struct ImportPlaylistSheet: View {
             songSearchText = ""
             successMessage = "Created \"\(trimmedName)\" — \(trackCount) tracks"
             try? await Task.sleep(for: .seconds(1.5))
+            NotificationCenter.default.post(name: .switchToLibraryTab, object: nil)
             dismiss()
         } catch {
             errorMessage = "Failed to save: \(error.localizedDescription)"
@@ -632,9 +651,14 @@ struct ImportPlaylistSheet: View {
 
         do {
             try modelContext.save()
-            if !notFound.isEmpty {
-                statusMessage = "Created! \(notFound.count) song(s) not found."
+            isLoading = false
+            if notFound.isEmpty {
+                successMessage = "Imported \"\(trimmedName)\" — \(foundTracks.count) tracks"
+            } else {
+                successMessage = "Imported \"\(trimmedName)\" — \(foundTracks.count) tracks (\(notFound.count) not found)"
             }
+            try? await Task.sleep(for: .seconds(1.5))
+            NotificationCenter.default.post(name: .switchToLibraryTab, object: nil)
             dismiss()
         } catch {
             errorMessage = "Failed to save: \(error.localizedDescription)"
