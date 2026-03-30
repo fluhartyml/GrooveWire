@@ -25,6 +25,13 @@ struct ImportPlaylistSheet: View {
     // Songs mode
     @State private var songsPlaylistName = ""
     @State private var songsText = ""
+    @State private var songSearchText = ""
+    @State private var songSearchResults: [Track] = []
+    @State private var songSearching = false
+    @State private var addedTracks: [Track] = []
+    @State private var searchTask: Task<Void, Never>?
+    @State private var searchOffset = 0
+    @State private var hasMoreResults = false
 
     // File mode
     @State private var filePlaylistName = ""
@@ -72,13 +79,119 @@ struct ImportPlaylistSheet: View {
                     }
 
                     Section {
-                        TextEditor(text: $songsText)
-                            .font(.system(.caption, design: .monospaced))
-                            .frame(minHeight: 150)
+                        TextField("Search songs or paste Title, Artist", text: $songSearchText)
+                            .textFieldStyle(.roundedBorder)
+                            .onChange(of: songSearchText) { _, newValue in
+                                searchTask?.cancel()
+                                let query = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                                guard query.count >= 2 else {
+                                    songSearchResults = []
+                                    return
+                                }
+                                searchTask = Task {
+                                    try? await Task.sleep(for: .milliseconds(400))
+                                    guard !Task.isCancelled else { return }
+                                    songSearching = true
+                                    searchOffset = 0
+                                    var results: [Track] = []
+                                    if spotifyService.isConnected {
+                                        results = (try? await spotifyService.search(query: query, offset: 0)) ?? []
+                                    } else if appleMusicService.isConnected {
+                                        results = (try? await appleMusicService.search(query: query)) ?? []
+                                    }
+                                    guard !Task.isCancelled else { return }
+                                    songSearchResults = results
+                                    hasMoreResults = results.count >= 25
+                                    searchOffset = results.count
+                                    songSearching = false
+                                }
+                            }
                     } header: {
-                        Text("Songs")
+                        Text("Search")
                     } footer: {
-                        Text("One song per line: Title, Artist\nOr with album: Title, Artist, Album\nA header row is automatically skipped.")
+                        Text("Type a song name, artist, or paste Title, Artist to search.")
+                    }
+
+                    if songSearching {
+                        Section {
+                            HStack {
+                                ProgressView().controlSize(.small)
+                                Text("Searching...").font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+
+                    if !songSearchResults.isEmpty {
+                        Section("Results (\(songSearchResults.count))") {
+                            ForEach(songSearchResults) { track in
+                                Button {
+                                    if !addedTracks.contains(where: { $0.title == track.title && $0.artist == track.artist }) {
+                                        addedTracks.append(track)
+                                        songSearchText = ""
+                                        songSearchResults = []
+                                    }
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading) {
+                                            Text(track.title).font(.callout)
+                                            Text(track.artist).font(.caption).foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "plus.circle.fill")
+                                            .foregroundStyle(themeColor)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            if hasMoreResults {
+                                Button {
+                                    Task {
+                                        songSearching = true
+                                        let query = songSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+                                        var more: [Track] = []
+                                        if spotifyService.isConnected {
+                                            more = (try? await spotifyService.search(query: query, offset: searchOffset)) ?? []
+                                        } else if appleMusicService.isConnected {
+                                            more = (try? await appleMusicService.search(query: query)) ?? []
+                                        }
+                                        songSearchResults.append(contentsOf: more)
+                                        hasMoreResults = more.count >= 25
+                                        searchOffset += more.count
+                                        songSearching = false
+                                    }
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        Text("Show More Results")
+                                            .foregroundStyle(themeColor)
+                                        Spacer()
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    if !addedTracks.isEmpty {
+                        Section("Playlist (\(addedTracks.count) tracks)") {
+                            ForEach(addedTracks) { track in
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(track.title).font(.callout)
+                                        Text(track.artist).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Button {
+                                        addedTracks.removeAll { $0.id == track.id }
+                                    } label: {
+                                        Image(systemName: "minus.circle.fill")
+                                            .foregroundStyle(.red)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
                     }
 
                 case .file:
@@ -237,7 +350,7 @@ struct ImportPlaylistSheet: View {
             return linkText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading
         case .songs:
             return songsPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                || songsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || addedTracks.isEmpty
                 || isLoading
         case .file:
             return filePlaylistName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -253,7 +366,7 @@ struct ImportPlaylistSheet: View {
         case .link:
             await saveFromLink()
         case .songs:
-            await createFromSongs(name: songsPlaylistName, rawText: songsText)
+            await saveFromSearch()
         case .file:
             await createFromSongs(name: filePlaylistName, rawText: fileContents)
         case .appleMusic:
@@ -354,6 +467,46 @@ struct ImportPlaylistSheet: View {
             dismiss()
         } catch {
             errorMessage = "Failed to fetch playlist: \(error.localizedDescription)"
+            isLoading = false
+        }
+    }
+
+    private func saveFromSearch() async {
+        let trimmedName = songsPlaylistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !addedTracks.isEmpty else { return }
+
+        isLoading = true
+        errorMessage = nil
+
+        let savedPlaylist = SavedPlaylist(
+            name: trimmedName,
+            isPublic: false
+        )
+        modelContext.insert(savedPlaylist)
+
+        for track in addedTracks {
+            let localTrack = Track(
+                title: track.title,
+                artist: track.artist,
+                albumTitle: track.albumTitle,
+                artworkURL: track.artworkURL,
+                appleMusicID: track.appleMusicID,
+                spotifyID: track.spotifyID,
+                durationSeconds: track.durationSeconds
+            )
+            localTrack.savedPlaylist = savedPlaylist
+            modelContext.insert(localTrack)
+            savedPlaylist.trackList.append(localTrack)
+        }
+
+        do {
+            try modelContext.save()
+            isLoading = false
+            successMessage = "Created \"\(trimmedName)\" — \(addedTracks.count) tracks"
+            try? await Task.sleep(for: .seconds(1.5))
+            dismiss()
+        } catch {
+            errorMessage = "Failed to save: \(error.localizedDescription)"
             isLoading = false
         }
     }
