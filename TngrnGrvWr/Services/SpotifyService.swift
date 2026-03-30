@@ -7,12 +7,19 @@ final class SpotifyService: StreamingServiceProtocol {
     var isConnected: Bool { authManager.isAuthenticated }
 
     var availableDevices: [SpotifyDevice] = []
-    var selectedDeviceID: String?
+    var selectedDeviceID: String? {
+        didSet {
+            if let id = selectedDeviceID {
+                UserDefaults.standard.set(id, forKey: "spotify_selected_device_id")
+            }
+        }
+    }
 
     private let baseURL = "https://api.spotify.com/v1"
 
     init(authManager: SpotifyAuthManager = SpotifyAuthManager()) {
         self.authManager = authManager
+        self.selectedDeviceID = UserDefaults.standard.string(forKey: "spotify_selected_device_id")
     }
 
     // MARK: - Profile
