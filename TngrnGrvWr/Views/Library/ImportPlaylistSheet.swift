@@ -93,15 +93,29 @@ struct ImportPlaylistSheet: View {
                                     guard !Task.isCancelled else { return }
                                     songSearching = true
                                     searchOffset = 0
-                                    var results: [Track] = []
-                                    if spotifyService.isConnected {
-                                        results = (try? await spotifyService.search(query: query, offset: 0)) ?? []
-                                    } else if appleMusicService.isConnected {
-                                        results = (try? await appleMusicService.search(query: query)) ?? []
+                                    var spotifyResults: [Track] = []
+                                    var amResults: [Track] = []
+                                    await withTaskGroup(of: Void.self) { group in
+                                        if spotifyService.isConnected {
+                                            group.addTask {
+                                                spotifyResults = (try? await spotifyService.search(query: query, offset: 0)) ?? []
+                                            }
+                                        }
+                                        if appleMusicService.isConnected {
+                                            group.addTask {
+                                                amResults = (try? await appleMusicService.search(query: query)) ?? []
+                                            }
+                                        }
+                                    }
+                                    var results = spotifyResults
+                                    for track in amResults {
+                                        if !results.contains(where: { $0.title.lowercased() == track.title.lowercased() && $0.artist.lowercased() == track.artist.lowercased() }) {
+                                            results.append(track)
+                                        }
                                     }
                                     guard !Task.isCancelled else { return }
                                     songSearchResults = results
-                                    hasMoreResults = results.count >= 25
+                                    hasMoreResults = results.count >= 10
                                     searchOffset = results.count
                                     songSearching = false
                                 }
@@ -132,6 +146,17 @@ struct ImportPlaylistSheet: View {
                                     }
                                 } label: {
                                     HStack {
+                                        if track.spotifyID != nil {
+                                            Image(systemName: "antenna.radiowaves.left.and.right")
+                                                .foregroundStyle(.green)
+                                                .font(.caption2)
+                                                .frame(width: 16)
+                                        } else if track.appleMusicID != nil {
+                                            Image(systemName: "apple.logo")
+                                                .foregroundStyle(.gray)
+                                                .font(.caption2)
+                                                .frame(width: 16)
+                                        }
                                         VStack(alignment: .leading) {
                                             Text(track.title).font(.callout)
                                             Text(track.artist).font(.caption).foregroundStyle(.secondary)
@@ -152,11 +177,17 @@ struct ImportPlaylistSheet: View {
                                         var more: [Track] = []
                                         if spotifyService.isConnected {
                                             more = (try? await spotifyService.search(query: query, offset: searchOffset)) ?? []
-                                        } else if appleMusicService.isConnected {
-                                            more = (try? await appleMusicService.search(query: query)) ?? []
+                                        }
+                                        if appleMusicService.isConnected {
+                                            let amMore = (try? await appleMusicService.search(query: query)) ?? []
+                                            for track in amMore {
+                                                if !more.contains(where: { $0.title.lowercased() == track.title.lowercased() && $0.artist.lowercased() == track.artist.lowercased() }) {
+                                                    more.append(track)
+                                                }
+                                            }
                                         }
                                         songSearchResults.append(contentsOf: more)
-                                        hasMoreResults = more.count >= 25
+                                        hasMoreResults = more.count >= 20
                                         searchOffset += more.count
                                         songSearching = false
                                     }

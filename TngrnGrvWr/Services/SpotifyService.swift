@@ -323,12 +323,15 @@ final class SpotifyService: StreamingServiceProtocol {
     func search(query: String, offset: Int) async throws -> [Track] {
         let token = try await authManager.validToken()
         var components = URLComponents(string: "\(baseURL)/search")!
-        components.queryItems = [
+        var queryItems = [
             URLQueryItem(name: "q", value: query),
             URLQueryItem(name: "type", value: "track"),
-            URLQueryItem(name: "limit", value: "25"),
-            URLQueryItem(name: "offset", value: "\(offset)")
+            URLQueryItem(name: "limit", value: "10")
         ]
+        if offset > 0 {
+            queryItems.append(URLQueryItem(name: "offset", value: "\(offset)"))
+        }
+        components.queryItems = queryItems
         let url = components.url!
         print("🔍 [SpotifyService] Request URL: \(url.absoluteString)")
 
