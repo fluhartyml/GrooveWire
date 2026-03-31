@@ -91,7 +91,7 @@ struct GrooveWireView: View {
                                     .foregroundStyle(themeColor)
                                     .frame(width: 20)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Build Playlist from Song")
+                                    Text("Build Playlist from Song Seed")
                                         .font(.subheadline.weight(.medium))
                                     Text("Pick a seed song, get recommendations, save as playlist")
                                         .font(.caption2)

@@ -355,7 +355,7 @@ final class SpotifyService: StreamingServiceProtocol {
                     if attempt < maxRetries {
                         let retryAfter = http.value(forHTTPHeaderField: "Retry-After")
                             .flatMap { UInt64($0) }
-                        let waitSeconds = retryAfter ?? (retryDelay / 1_000_000_000)
+                        let waitSeconds = min(retryAfter ?? (retryDelay / 1_000_000_000), 30)
                         print("🔍 [SpotifyService] Rate limited — waiting \(waitSeconds)s before retry \(attempt + 1)/\(maxRetries)")
                         try await Task.sleep(nanoseconds: waitSeconds * 1_000_000_000)
                         retryDelay *= 2
