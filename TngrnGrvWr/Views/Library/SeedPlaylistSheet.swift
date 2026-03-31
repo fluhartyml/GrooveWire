@@ -15,6 +15,7 @@ struct SeedPlaylistSheet: View {
     @State private var searchResults: [Track] = []
     @State private var isSearching = false
     @State private var hasSearched = false
+    @State private var searchTask: Task<Void, Never>?
 
     @State private var seedTrack: Track?
     @State private var recommendations: [Track] = []
@@ -79,9 +80,48 @@ struct SeedPlaylistSheet: View {
                 TextField("Search for a song to build around...", text: $searchQuery)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { performSearch() }
+                    .onChange(of: searchQuery) { _, newValue in
+                        searchTask?.cancel()
+                        guard !newValue.isEmpty else {
+                            searchResults = []
+                            hasSearched = false
+                            return
+                        }
+                        searchTask = Task {
+                            try? await Task.sleep(for: .milliseconds(600))
+                            guard !Task.isCancelled else { return }
+                            await MainActor.run {
+                                isSearching = true
+                                hasSearched = true
+                                error = nil
+                            }
+                            guard !Task.isCancelled else { return }
+                            let query = newValue
+                            do {
+                                let results: [Track]
+                                if appleMusicService.isConnected {
+                                    results = try await appleMusicService.search(query: query)
+                                } else if spotifyService.isConnected {
+                                    results = try await spotifyService.search(query: query)
+                                } else {
+                                    results = []
+                                }
+                                guard !Task.isCancelled else { return }
+                                await MainActor.run {
+                                    searchResults = results
+                                    isSearching = false
+                                }
+                            } catch {
+                                guard !Task.isCancelled else { return }
+                                await MainActor.run { isSearching = false }
+                            }
+                        }
+                    }
 
-                Button("Search") { performSearch() }
-                    .disabled(searchQuery.isEmpty || isSearching)
+                if isSearching {
+                    ProgressView()
+                        .controlSize(.small)
+                }
             }
             .padding()
 
@@ -270,12 +310,10 @@ struct SeedPlaylistSheet: View {
 
         Task {
             do {
-                if spotifyService.isConnected && appleMusicService.isConnected {
-                    searchResults = await matchingService.searchBothServices(query: searchQuery)
+                if appleMusicService.isConnected {
+                    searchResults = try await appleMusicService.search(query: searchQuery)
                 } else if spotifyService.isConnected {
                     searchResults = try await spotifyService.search(query: searchQuery)
-                } else if appleMusicService.isConnected {
-                    searchResults = try await appleMusicService.search(query: searchQuery)
                 } else {
                     error = "Connect a streaming service in Profile to search."
                 }
@@ -294,16 +332,25 @@ struct SeedPlaylistSheet: View {
             do {
                 var recs: [Track] = []
 
-                // Apple Music recommendations (MusicKit artist+genre search)
-                if appleMusicService.isConnected, let appleMusicID = track.appleMusicID {
-                    recs = try await appleMusicService.getRecommendations(seedTrackID: appleMusicID, limit: 25)
+                // Use Spotify recommendations API for quality results
+                if spotifyService.isConnected {
+                    var spotifyID = track.spotifyID
+
+                    // If seed came from Apple Music, find its Spotify ID first
+                    if spotifyID == nil {
+                        let matches = try await spotifyService.search(query: "\(track.artist) \(track.title)")
+                        spotifyID = matches.first?.spotifyID
+                    }
+
+                    if let seedID = spotifyID {
+                        recs = try await spotifyService.getRecommendations(seedTrackID: seedID, limit: 25)
+                    }
                 }
 
-                // Fallback: if no Apple Music results, try Spotify search for similar artist
-                if recs.isEmpty, spotifyService.isConnected {
-                    recs = try await spotifyService.search(query: "\(track.artist) \(track.albumTitle ?? "")")
-                    // Filter out the seed track itself
-                    recs = recs.filter { $0.spotifyID != track.spotifyID }
+                // Fallback: Apple Music catalog search if Spotify unavailable
+                if recs.isEmpty, appleMusicService.isConnected {
+                    recs = try await appleMusicService.search(query: "\(track.artist) \(track.title)")
+                    recs = recs.filter { $0.appleMusicID != track.appleMusicID }
                     recs = Array(recs.prefix(25))
                 }
 

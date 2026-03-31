@@ -373,6 +373,58 @@ final class SpotifyService: StreamingServiceProtocol {
         throw SpotifyError.rateLimited
     }
 
+    // MARK: - Recommendations
+
+    func getRecommendations(seedTrackID: String, limit: Int = 25) async throws -> [Track] {
+        let token = try await authManager.validToken()
+        var components = URLComponents(string: "\(baseURL)/recommendations")!
+        components.queryItems = [
+            URLQueryItem(name: "seed_tracks", value: seedTrackID),
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
+        let url = components.url!
+        print("🎯 [SpotifyService] Recommendations URL: \(url.absoluteString)")
+
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse {
+            print("🎯 [SpotifyService] Recommendations HTTP \(http.statusCode)")
+            if http.statusCode == 429 {
+                throw SpotifyError.rateLimited
+            }
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tracks = json["tracks"] as? [[String: Any]] else {
+            return []
+        }
+
+        return tracks.compactMap { item -> Track? in
+            guard let name = item["name"] as? String,
+                  let id = item["id"] as? String,
+                  let artists = item["artists"] as? [[String: Any]],
+                  let artistName = artists.first?["name"] as? String else { return nil }
+
+            let album = (item["album"] as? [String: Any])?["name"] as? String
+            let artworkURLString: String? = {
+                guard let album = item["album"] as? [String: Any],
+                      let images = album["images"] as? [[String: Any]],
+                      let urlString = images.first?["url"] as? String else { return nil }
+                return urlString
+            }()
+            let duration = (item["duration_ms"] as? Int).map { Double($0) / 1000.0 }
+
+            let track = Track(title: name, artist: artistName)
+            track.spotifyID = id
+            track.albumTitle = album
+            track.artworkURL = artworkURLString
+            track.durationSeconds = duration ?? 0
+            return track
+        }
+    }
+
     // MARK: - Playback
 
     func play(track: Track) async throws {
