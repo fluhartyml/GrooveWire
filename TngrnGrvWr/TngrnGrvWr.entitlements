@@ -12,7 +12,12 @@
 	</array>
 	<key>com.apple.developer.icloud-services</key>
 	<array>
+		<string>CloudDocuments</string>
 		<string>CloudKit</string>
+	</array>
+	<key>com.apple.developer.ubiquity-container-identifiers</key>
+	<array>
+		<string>iCloud.com.TangerineGrooveWire.TngrnGrvWr</string>
 	</array>
 	<key>com.apple.security.network.client</key>
 	<true/>
