@@ -24,6 +24,45 @@
 //  Location:       /Users/michaelfluharty/Developer/TngrnGrvWr/
 
 // ============================================================================
+// MARK: - APP STORE CONNECT
+// ============================================================================
+//
+// ** Claude: Update this section as information becomes available.
+// ** Keep current with every submission. This is the source of truth.
+//
+//  App Name:           Tangerine GrooveWire
+//  App Apple ID:       (not yet submitted)
+//  Bundle ID:          com.TangerineGrooveWire.TngrnGrvWr
+//  Category:           Music
+//  URL:                (pending first submission)
+//  Current Version:    1.0 (pre-release)
+//  Status:             In development — Mac shakedown paused at M-33
+//
+//  Subtitle:           (TBD)
+//
+//  Promotional Text (170 char max, updatable anytime):
+//    (TBD)
+//
+//  Description:
+//    (TBD)
+//
+//  What's New:
+//    (TBD — first submission)
+//
+//  Privacy:            (TBD)
+//  License:            GPL v3
+//
+//  Version History:
+//    v1.0 (in progress) — Playlist curation and cross-service transfer
+//
+// ============================================================================
+// MARK: - CURRENT STATUS (APR 02 2026)
+// ============================================================================
+//
+//  Paused at M-33 Mac shakedown. Resumes after Milestones ships.
+//
+
+// ============================================================================
 // MARK: - DESCRIPTION
 // ============================================================================
 //

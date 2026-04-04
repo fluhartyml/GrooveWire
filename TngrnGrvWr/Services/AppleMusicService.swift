@@ -144,14 +144,16 @@ final class AppleMusicService: StreamingServiceProtocol {
         let seedResponse = try await seedRequest.response()
         guard let seedSong = seedResponse.items.first else { return [] }
 
-        // Search for similar songs using the artist + genre as search terms
-        let searchTerm = "\(seedSong.artistName) \(seedSong.genreNames.first ?? "")"
-        var request = MusicCatalogSearchRequest(term: searchTerm, types: [Song.self])
-        request.limit = limit
+        // Search by genre to get diverse artists, not just the seed artist's album
+        let genre = seedSong.genreNames.first ?? "Pop"
+        var request = MusicCatalogSearchRequest(term: genre, types: [Song.self])
+        request.limit = limit + 20 // Fetch extra to filter out seed artist
         let response = try await request.response()
 
-        return response.songs
-            .filter { $0.id.rawValue != seedTrackID } // Exclude the seed itself
+        let seedArtist = seedSong.artistName.lowercased()
+        return Array(response.songs
+            .filter { $0.id.rawValue != seedTrackID && $0.artistName.lowercased() != seedArtist }
+            .prefix(limit))
             .map { song in
                 Track(
                     title: song.title,

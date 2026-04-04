@@ -106,6 +106,18 @@ struct HomeView: View {
                     }
                 }
 
+                // MARK: - Playlist Locker
+                GroupBox("Playlist Locker") {
+                    VStack(spacing: 8) {
+                        NavigationLink {
+                            PlaylistLockerView()
+                        } label: {
+                            actionRow(icon: "lock.shield", title: "Playlist Locker", subtitle: "Backup and manage your playlists in iCloud Drive")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
                 // MARK: - Quick Actions
                 GroupBox("Quick Actions") {
                     VStack(spacing: 8) {

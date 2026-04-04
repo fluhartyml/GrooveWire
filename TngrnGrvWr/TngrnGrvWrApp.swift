@@ -14,6 +14,7 @@ struct TngrnGrvWrApp: App {
     @State private var appleMusicService = AppleMusicService()
     @State private var playbackManager: PlaybackManager?
     @State private var trackMatchingService: TrackMatchingService?
+    @State private var playlistLockerService = PlaylistLockerService()
 
     private let accentColor = Color(red: 1.0, green: 0.52, blue: 0.0) // Tangerine
 
@@ -39,6 +40,7 @@ struct TngrnGrvWrApp: App {
                 .environment(appleMusicService)
                 .environment(playbackManager ?? PlaybackManager(spotifyService: spotifyService, appleMusicService: appleMusicService))
                 .environment(trackMatchingService ?? TrackMatchingService(spotifyService: spotifyService, appleMusicService: appleMusicService))
+                .environment(playlistLockerService)
                 .environment(\.themeColor, accentColor)
                 .tint(accentColor)
                 .onAppear {
