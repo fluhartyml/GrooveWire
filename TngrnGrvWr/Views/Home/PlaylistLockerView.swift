@@ -9,10 +9,38 @@ struct PlaylistLockerView: View {
     @State private var showDeleteConfirm = false
     @State private var fileToDelete: LockerFile?
 
+    /// Group files by their date-stamped folder
+    private var groupedFiles: [(folder: String, files: [LockerFile])] {
+        let grouped = Dictionary(grouping: lockerService.lockerFiles) { $0.folder }
+        return grouped
+            .sorted { $0.key > $1.key }
+            .map { (folder: $0.key, files: $0.value) }
+    }
+
     var body: some View {
         List {
             // MARK: - Backup Actions
             Section {
+                Button {
+                    Task { await backupAll() }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.down.doc.fill")
+                            .foregroundStyle(themeColor)
+                            .frame(width: 20)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Backup All Services")
+                                .font(.subheadline.weight(.medium))
+                            Text("Save all connected playlists to iCloud Drive")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(lockerService.isBackingUp || (!appleMusicService.isConnected && !spotifyService.isConnected))
+
                 Button {
                     Task { await backupAppleMusic() }
                 } label: {
@@ -23,13 +51,11 @@ struct PlaylistLockerView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Backup Apple Music")
                                 .font(.subheadline.weight(.medium))
-                            Text("Save all playlists to iCloud Drive")
+                            Text("Save Apple Music playlists only")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Image(systemName: "arrow.down.doc")
-                            .foregroundStyle(themeColor)
                     }
                 }
                 .buttonStyle(.plain)
@@ -45,13 +71,11 @@ struct PlaylistLockerView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Backup Spotify")
                                 .font(.subheadline.weight(.medium))
-                            Text("Save all playlists to iCloud Drive")
+                            Text("Save Spotify playlists only")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Image(systemName: "arrow.down.doc")
-                            .foregroundStyle(themeColor)
                     }
                 }
                 .buttonStyle(.plain)
@@ -67,60 +91,59 @@ struct PlaylistLockerView: View {
             }
 
             // MARK: - Locker Contents
-            Section {
-                if lockerService.lockerFiles.isEmpty {
+            if lockerService.lockerFiles.isEmpty {
+                Section {
                     ContentUnavailableView(
                         "Locker is Empty",
                         systemImage: "lock.open",
                         description: Text("Back up your playlists to see them here.")
                     )
-                } else {
-                    ForEach(lockerService.lockerFiles) { file in
-                        HStack(spacing: 10) {
-                            lockerIcon(for: file.source)
-                                .frame(width: 36, height: 36)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+            } else {
+                ForEach(groupedFiles, id: \.folder) { group in
+                    Section {
+                        ForEach(group.files) { file in
+                            HStack(spacing: 10) {
+                                lockerIcon(for: file.source)
+                                    .frame(width: 36, height: 36)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(file.name)
-                                    .font(.subheadline.weight(.medium))
-                                    .lineLimit(1)
-                                HStack(spacing: 6) {
-                                    Text(file.source.displayName)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                    Text("·")
-                                        .foregroundStyle(.tertiary)
-                                    Text(file.formattedSize)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                    Text("·")
-                                        .foregroundStyle(.tertiary)
-                                    Text(file.createdAt, style: .date)
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(file.name)
+                                        .font(.subheadline.weight(.medium))
+                                        .lineLimit(1)
+                                    HStack(spacing: 6) {
+                                        Text(file.source.displayName)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                        Text("·")
+                                            .foregroundStyle(.tertiary)
+                                        Text(file.formattedSize)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+
+                                Spacer()
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    fileToDelete = file
+                                    showDeleteConfirm = true
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
                                 }
                             }
-
-                            Spacer()
                         }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                fileToDelete = file
-                                showDeleteConfirm = true
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
+                    } header: {
+                        HStack {
+                            Text(group.folder)
+                            Spacer()
+                            Text("\(group.files.count) playlists")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
                         }
                     }
-                }
-            } header: {
-                HStack {
-                    Text("Playlist Locker")
-                    Spacer()
-                    Text("\(lockerService.lockerFiles.count) playlists")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -199,6 +222,14 @@ struct PlaylistLockerView: View {
                 .foregroundStyle(themeColor)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.secondary.opacity(0.1))
+        }
+    }
+
+    private func backupAll() async {
+        do {
+            try await lockerService.backupAll(appleMusic: appleMusicService, spotify: spotifyService)
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

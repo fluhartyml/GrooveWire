@@ -13,11 +13,29 @@ final class PlaylistLockerService {
 
     private let fileManager = FileManager.default
 
-    /// The iCloud Drive folder where M3U files are stored.
+    /// The iCloud Drive root folder for the Playlist Locker.
     var lockerURL: URL? {
         fileManager
             .url(forUbiquityContainerIdentifier: nil)?
             .appendingPathComponent("Documents/Playlist Locker", isDirectory: true)
+    }
+
+    /// Date stamp prefix, e.g. "2026 APR 04"
+    private var dateStamp: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy MMM dd"
+        return formatter.string(from: Date()).uppercased()
+    }
+
+    /// Backup subfolder URL for a specific service, e.g. "2026 APR 04 Backup.Spotify"
+    private func backupURL(for source: StreamingService) -> URL? {
+        let suffix: String
+        switch source {
+        case .spotify: suffix = ".Spotify"
+        case .appleMusic: suffix = ".AppleMusic"
+        case .none: suffix = ""
+        }
+        return lockerURL?.appendingPathComponent("\(dateStamp) Backup\(suffix)", isDirectory: true)
     }
 
     // MARK: - Scan Locker
@@ -28,37 +46,65 @@ final class PlaylistLockerService {
             return
         }
 
-        // Create the folder if it doesn't exist
         if !fileManager.fileExists(atPath: url.path) {
             try? fileManager.createDirectory(at: url, withIntermediateDirectories: true)
         }
 
-        let contents = (try? fileManager.contentsOfDirectory(
+        // Scan all subfolders recursively for M3U files
+        guard let enumerator = fileManager.enumerator(
             at: url,
             includingPropertiesForKeys: [.creationDateKey, .fileSizeKey],
-            options: .skipsHiddenFiles
-        )) ?? []
+            options: [.skipsHiddenFiles]
+        ) else {
+            lockerFiles = []
+            return
+        }
 
-        lockerFiles = contents
-            .filter { $0.pathExtension.lowercased() == "m3u" }
-            .compactMap { fileURL in
-                let name = fileURL.deletingPathExtension().lastPathComponent
-                let attrs = try? fileManager.attributesOfItem(atPath: fileURL.path)
-                let created = attrs?[.creationDate] as? Date ?? Date()
-                let size = attrs?[.size] as? Int ?? 0
+        var files: [LockerFile] = []
+        for case let fileURL as URL in enumerator {
+            guard fileURL.pathExtension.lowercased() == "m3u" else { continue }
+            let attrs = try? fileManager.attributesOfItem(atPath: fileURL.path)
+            let created = attrs?[.creationDate] as? Date ?? Date()
+            let size = attrs?[.size] as? Int ?? 0
+            let source = readSourceFromM3U(fileURL)
 
-                // Determine source from the M3U header
-                let source = readSourceFromM3U(fileURL)
+            // Use parent folder name as group label
+            let folder = fileURL.deletingLastPathComponent().lastPathComponent
+            let name = fileURL.deletingPathExtension().lastPathComponent
 
-                return LockerFile(
-                    url: fileURL,
-                    name: name,
-                    source: source,
-                    createdAt: created,
-                    fileSize: size
-                )
-            }
-            .sorted { $0.createdAt > $1.createdAt }
+            files.append(LockerFile(
+                url: fileURL,
+                name: name,
+                folder: folder,
+                source: source,
+                createdAt: created,
+                fileSize: size
+            ))
+        }
+
+        lockerFiles = files.sorted { $0.createdAt > $1.createdAt }
+    }
+
+    // MARK: - Backup All
+
+    func backupAll(appleMusic: AppleMusicService, spotify: SpotifyService) async throws {
+        isBackingUp = true
+        defer { isBackingUp = false }
+
+        var totalCount = 0
+
+        if appleMusic.isConnected {
+            let count = try await backupAppleMusicPlaylists(service: appleMusic)
+            totalCount += count
+        }
+
+        if spotify.isConnected {
+            let count = try await backupSpotifyPlaylists(service: spotify)
+            totalCount += count
+        }
+
+        backupProgress = "Done — \(totalCount) playlists backed up"
+        scanLocker()
     }
 
     // MARK: - Backup Apple Music
@@ -67,11 +113,17 @@ final class PlaylistLockerService {
         isBackingUp = true
         defer { isBackingUp = false }
 
+        let count = try await backupAppleMusicPlaylists(service: service)
+        backupProgress = "Done — \(count) playlists backed up"
+        scanLocker()
+    }
+
+    private func backupAppleMusicPlaylists(service: AppleMusicService) async throws -> Int {
         backupProgress = "Fetching Apple Music playlists…"
         let playlists = try await service.fetchPlaylists()
 
         for (index, playlist) in playlists.enumerated() {
-            backupProgress = "Backing up \(index + 1)/\(playlists.count): \(playlist.name)"
+            backupProgress = "Apple Music \(index + 1)/\(playlists.count): \(playlist.name)"
             let tracks = try await service.fetchPlaylistTracks(playlistID: playlist.id)
             let m3uContent = buildM3U(
                 playlistName: playlist.name,
@@ -81,8 +133,7 @@ final class PlaylistLockerService {
             try writeM3U(name: playlist.name, source: .appleMusic, content: m3uContent)
         }
 
-        backupProgress = "Done — \(playlists.count) playlists backed up"
-        scanLocker()
+        return playlists.count
     }
 
     // MARK: - Backup Spotify
@@ -91,11 +142,17 @@ final class PlaylistLockerService {
         isBackingUp = true
         defer { isBackingUp = false }
 
+        let count = try await backupSpotifyPlaylists(service: service)
+        backupProgress = "Done — \(count) playlists backed up"
+        scanLocker()
+    }
+
+    private func backupSpotifyPlaylists(service: SpotifyService) async throws -> Int {
         backupProgress = "Fetching Spotify playlists…"
         let playlists = try await service.fetchPlaylists()
 
         for (index, playlist) in playlists.enumerated() {
-            backupProgress = "Backing up \(index + 1)/\(playlists.count): \(playlist.name)"
+            backupProgress = "Spotify \(index + 1)/\(playlists.count): \(playlist.name)"
             let tracks = try await service.fetchPlaylistTracks(playlistID: playlist.id)
             let m3uContent = buildM3U(
                 playlistName: playlist.name,
@@ -105,8 +162,7 @@ final class PlaylistLockerService {
             try writeM3U(name: playlist.name, source: .spotify, content: m3uContent)
         }
 
-        backupProgress = "Done — \(playlists.count) playlists backed up"
-        scanLocker()
+        return playlists.count
     }
 
     // MARK: - Delete
@@ -155,19 +211,19 @@ final class PlaylistLockerService {
     // MARK: - File I/O
 
     private func writeM3U(name: String, source: StreamingService, content: String) throws {
-        guard let lockerURL else {
+        guard let backupURL = backupURL(for: source) else {
             throw LockerError.noiCloud
         }
 
-        if !fileManager.fileExists(atPath: lockerURL.path) {
-            try fileManager.createDirectory(at: lockerURL, withIntermediateDirectories: true)
+        if !fileManager.fileExists(atPath: backupURL.path) {
+            try fileManager.createDirectory(at: backupURL, withIntermediateDirectories: true)
         }
 
         // Sanitize filename
         let safeName = name
             .replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: ":", with: "-")
-        let fileURL = lockerURL.appendingPathComponent("\(safeName).m3u")
+        let fileURL = backupURL.appendingPathComponent("\(safeName).m3u")
 
         try content.write(to: fileURL, atomically: true, encoding: .utf8)
 
@@ -214,6 +270,7 @@ final class PlaylistLockerService {
 struct LockerFile: Identifiable {
     let url: URL
     let name: String
+    let folder: String
     let source: StreamingService
     let createdAt: Date
     let fileSize: Int
