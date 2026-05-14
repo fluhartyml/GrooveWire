@@ -626,9 +626,107 @@
 //
 
 // ============================================================================
+// MARK: - SOCIAL ARCHITECTURE (locked 2026-05-14)
+// ============================================================================
+//
+//  Three layered surfaces work together to deliver the social-listening
+//  product. Each has a distinct role; they stack rather than compete.
+//
+//  1. CROSS-SERVICE BRIDGE (the core moat)
+//  ---------------------------------------
+//  Each user listens via THEIR OWN service of choice (Apple Music subscription,
+//  Spotify subscription, etc.). The app handles cross-catalog matching and
+//  keeps playback timestamps in lockstep so the listening experience is
+//  synchronized across services.
+//
+//  Mechanics:
+//   - User A logs in with Apple Music → MusicKit plays on A's device
+//   - User B logs in with Spotify → Spotify iOS SDK plays on B's device
+//   - For each track: app looks up matching catalog ID on each service via
+//     ISRC code (industry standard recording identifier, mostly reliable),
+//     fuzzy fallback on artist+title+album+duration
+//   - App sends `play(trackID, atTimestamp)` to each device; each plays from
+//     its OWN service under its OWN subscription. Sync layer maintains
+//     ±300ms tolerance.
+//
+//  Legitimacy: A pays Apple, B pays Spotify. Both services receive proper
+//  per-listener royalties. No subscription is shared. Each play = one
+//  license. This is the labels' preferred streaming model.
+//
+//  Caveats:
+//   - Some tracks are exclusive to one service. Graceful fallback: skip,
+//     show "not available on your service," or offer 30-sec preview.
+//   - ISRC tags aren't always exposed via API. Fuzzy fallback covers most
+//     cases but isn't perfect.
+//   - Sync drift: network latency + audio buffer + UI command lag stack up.
+//     ±300ms on good Wi-Fi; ±1s honest worst case.
+//
+//  Apple won't build this (wants users on Apple Music). Spotify won't build
+//  the inverse (wants users on Spotify). A third-party app is the only
+//  legitimate neutral bridge — that's TangerineGrooveWire's structural moat.
+//
+//  2. SHAREPLAY (live co-listening within a service)
+//  --------------------------------------------------
+//  When both users happen to be on the same service, use Apple's built-in
+//  SharePlay via the GroupActivities framework — no need for the bridge.
+//  Best for "let's listen to this right now" in an active FaceTime call or
+//  iMessage SharePlay session.
+//
+//  Apple Music already supports SharePlay natively. TangerineGrooveWire-via-
+//  SharePlay adds value via the retro-player UI, curation tools, and social
+//  layer on top — not by reinventing the sync.
+//
+//  3. iMESSAGE EXTENSION (async sharing + lightweight on-ramp)
+//  -----------------------------------------------------------
+//  Built-in iMessage Extension target ships with the main app. Lets users:
+//   - Share a playlist as a rich tappable bubble in any Messages thread
+//   - Preview tracks inline
+//   - Co-build a shared playlist asynchronously (both users add tracks
+//     from inside iMessage; the bubble updates live)
+//   - Chat about specific tracks within the playlist context
+//
+//  Persistent in conversation history; revisitable any time.
+//
+//  Distribution strategy (three tiers):
+//   - Tier 1: Full TangerineGrooveWire app (depth experience + extension
+//     bundled). Standard App Store install.
+//   - Tier 2: Standalone iMessage App via the iMessage App Store. Same
+//     Extension code, distributed separately under the Messages category,
+//     with the iMessage-App-Only flag set in Info.plist. Caregivers (in
+//     OPerationsHOS terms) or social-only users get a lighter on-ramp.
+//   - Tier 3: No install at all. Recipient sees a generic Messages bubble
+//     preview but can't interact. Conversion CTA: "Get the app to play
+//     along."
+//
+//  Conversion path: people get hooked on shared playlists via Tier 3 →
+//  install Tier 2 (lightweight) → upgrade to Tier 1 (full experience) when
+//  the depth features appeal. Same playbook GamePigeon and Polls run.
+//
+//  HOW THE LAYERS STACK
+//  --------------------
+//  Async discovery + lightweight social entry: iMessage Extension.
+//  Live co-listening when on the same service: SharePlay.
+//  Live co-listening across different services: cross-service bridge with
+//    custom sync layer.
+//  Depth experience (browse, curate, manage library): full app.
+//
+//  Caveat: free-tier listeners (no Apple Music / Spotify subscription) can
+//  see what's playing in any SharePlay or bridge session but cannot hear
+//  the synchronized audio — labels enforce per-listener subscription via
+//  the licensing model. Graceful degradation: see/chat/react, hear 30-sec
+//  previews, CTA to subscribe.
+
+// ============================================================================
 // MARK: - DEVELOPER NOTES LOG
 // ============================================================================
 //
+//  2026 MAY 14 — Social architecture locked: three-layer stack (cross-service
+//                bridge, SharePlay, iMessage Extension). Cross-service bridge
+//                identified as the structural moat (Apple won't build,
+//                Spotify won't build inverse). Three-tier distribution model
+//                (full app, standalone iMessage App, no-install preview)
+//                planned for conversion funnel. See SOCIAL ARCHITECTURE
+//                section above for full mechanics. (Claude Code)
 //  2026 MAR 29 — Full code evaluation: 30 hidden/undocumented features,
 //                4 duplicate code patterns, 6 dead code paths documented.
 //                Vote-sorted queue, DJ Mode, COPPA system, seed playlist
